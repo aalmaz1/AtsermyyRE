@@ -130,7 +130,6 @@ Additional issues:
 
 ## Cloud Storage (AWS S3)
 
-
 - The app obtains **temporary AWS credentials** from its own server
   (`mod=Upload&act=get_sts_token`).
 - Uploads/downloads go to the S3 bucket `hk-attach`, region `ap-east-1`.
