@@ -97,6 +97,7 @@ mod=Capital&act=getUserCapitalInfo
 *Investment API endpoints in `Constant.smali`.*
 
 ![Investment strings](images/strings_changtou.png)
+
 *Localized strings of the investment module (`usdt 起購`, `世界金融產品理財`, `Expected T+1 arrival`).*
 
 The field `only_usdt` in `PMyInformation` indicates the app is designed to work
