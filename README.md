@@ -123,15 +123,11 @@ Additional issues:
 - `toString()` prints **all** fields, including password, card number and CVV —
   a leak risk if logged.
 
-![Plaintext credentials in SharedPreferences](images/pminformation_plaintext.png)
-*Sensitive values stored without encryption.*
 
 ---
 
 ## Cloud Storage (AWS S3)
 
-![S3 configuration](images/privatephoto_s3.png)
-*S3 usage in `PrivatePhotoDetilesActivity`.*
 
 - The app obtains **temporary AWS credentials** from its own server
   (`mod=Upload&act=get_sts_token`).
