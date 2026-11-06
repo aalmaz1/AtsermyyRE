@@ -80,6 +80,7 @@ The manifest contains a complete investment lifecycle that has nothing to do wit
 
 API endpoints (from `Constant.smali`) confirm the same flow:
 
+```text
 mod=Capital&act=getFinancialProducts
 mod=Capital&act=buyFinancialProduct
 mod=Capital&act=getUserInvestments
@@ -87,6 +88,7 @@ mod=Capital&act=redeemInvestment
 mod=Capital&act=applyWithdraw
 mod=Capital&act=getUserWithdrawLogs
 mod=Capital&act=getUserCapitalInfo
+```
 
 
 ![Capital API endpoints](images/constant_capital.png)
@@ -142,7 +144,9 @@ Additional issues:
 
 API requests are signed as:
 
+```text
 api_token = MD5( mod + act + api_version + api_token_str )
+```
 
 
 This is a plain MD5 over a predictable concatenation, without a server-side secret.
