@@ -36,6 +36,8 @@ The application also collects **full payment card data** and stores the user's
 | VirusTotal | [https://www.virustotal.com/gui/file/2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5] |
 | Detection at time of check | 0/67 — *absence of signatures, not a proof of safety* |
 | Distribution | Sent directly via messenger (not Google Play) |
+| **Incident Date** | **October 19, 2026** (date of the scam attempt) |
+| **Infrastructure Status** | Domain `opppi[.]com` is currently offline (burner infrastructure) |
 
 ---
 
