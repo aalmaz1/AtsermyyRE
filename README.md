@@ -33,11 +33,13 @@ The application also collects **full payment card data** and stores the user's
 |---|---|
 | Package name | `com.FeiQQ.FeiQQ` |
 | SHA-256 | `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5` |
-| VirusTotal | [https://www.virustotal.com/gui/file/2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5] |
+| VirusTotal | [Report](https://www.virustotal.com/gui/file/2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5) |
 | Detection at time of check | 0/67 — *absence of signatures, not a proof of safety* |
 | Distribution | Sent directly via messenger (not Google Play) |
 | Incident Date | October 19, 2026 (date of the scam attempt) |
 | **Infrastructure Status** | Root domain disabled, but `www` subdomain is active behind Amazon CloudFront |
+
+**Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `DNS propagation check`, `WHOIS`.
 
 ---
 
@@ -157,6 +159,16 @@ requests can be forged.
 
 ---
 
+## MITRE ATT&CK Mapping
+
+The observed behavior maps to the following MITRE ATT&CK techniques:
+
+- **T1417:** Input Capture (fake investment forms capturing card data and CVV)
+- **T1409:** Stored Application Data (credentials and tokens stored in plaintext SharedPreferences)
+- **T1521:** Encrypted Channel (partially bypassed due to `usesCleartextTraffic="true"`)
+- **T1584:** Compromise Infrastructure (usage of Amazon CloudFront/Route53 to hide C2)
+- **T1428:** Exploitation for Client Execution (requesting `REQUEST_INSTALL_PACKAGES` for further payloads)
+
 ## Indicators of Compromise (IOCs)
 
 > Defanged for safety.
@@ -172,6 +184,18 @@ requests can be forged.
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 
 ---
+
+## Detection & Hunting
+
+To detect this specific campaign or similar threats:
+
+**Network:**
+- Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5.cloudfront.net`.
+- Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
+
+**Endpoint (Android):**
+- Search for the presence of the package `com.FeiQQ.FeiQQ`.
+- Check `SharedPreferences("MyInformation")` for plaintext keys like `credit_card_number` or `osskey`.
 
 ## What Is NOT Published
 
