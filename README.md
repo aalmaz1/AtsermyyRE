@@ -37,9 +37,11 @@ The application also collects **full payment card data** and stores the user's
 | Detection at time of check | 0/67 — *absence of signatures, not a proof of safety* |
 | Distribution | Sent directly via messenger (not Google Play) |
 | Incident Date | October 19, 2026 (date of the scam attempt) |
-| **Infrastructure Status** | Root domain disabled, but `www` subdomain is active behind Amazon CloudFront |
+| **Infrastructure Status** | **Mitigated by AWS (Case #179395433200804)** |
 
 **Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `DNS propagation check`, `WHOIS`.
+
+**Case Status:** Reported to AWS Trust & Safety. AWS confirmed that the malicious infrastructure (CloudFront/Route 53) has been **mitigated** (Case #179395433200804).
 
 ---
 
