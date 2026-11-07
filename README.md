@@ -42,7 +42,7 @@ The application also collects **full payment card data** and stores the user's
 **Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `DNS propagation check`, `WHOIS`.
 
 **Case Status:** Reported to AWS Trust & Safety. AWS confirmed that the malicious infrastructure (CloudFront/Route 53) has been **mitigated** (Case #179395433200804).
-![AWS Mitigation Confirmation](images/aws_mitigation.jpg)
+![AWS Mitigation Confirmation](images/aws_mitigation.png)
 *Official confirmation from AWS Trust & Safety that the reported infrastructure was mitigated.*
 
 ---
