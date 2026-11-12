@@ -201,6 +201,28 @@ To detect this specific campaign or similar threats:
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
 - Check `SharedPreferences("MyInformation")` for plaintext keys like `credit_card_number` or `osskey`.
 
+## YARA Rule
+
+To detect this specific campaign or similar threats, the following YARA rule can be used. It is based on unique strings identified during static analysis.
+
+yara
+rule RomanceScam_FeiQQ_APK {
+    meta:
+        description = "Detects FeiQQ romance scam APK based on static analysis artifacts"
+        author = "aalmaz1"
+        date = "2026-11-06"
+        reference = "https://github.com/aalmaz1/AtsermyyRE"
+        hash = "2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5"
+    strings:
+        $s1 = "com.FeiQQ.FeiQQ" ascii wide
+        $s2 = "mod=Capital&act=buyFinancialProduct" ascii wide
+        $s3 = "changtou_sjjrcplc" ascii wide
+        $s4 = "Onlinedating999@proton.me" ascii wide
+    condition:
+        uint32(0) == 0x04034b50 and 2 of them
+}
+
+
 ## What Is NOT Published
 
 For ethical and legal reasons, this repository does **not** contain:
