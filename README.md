@@ -205,7 +205,7 @@ To detect this specific campaign or similar threats:
 
 To detect this specific campaign or similar threats, the following YARA rule can be used. It is based on unique strings identified during static analysis.
 
-yara
+```yara
 rule RomanceScam_FeiQQ_APK {
     meta:
         description = "Detects FeiQQ romance scam APK based on static analysis artifacts"
@@ -221,6 +221,7 @@ rule RomanceScam_FeiQQ_APK {
     condition:
         uint32(0) == 0x04034b50 and 2 of them
 }
+```
 
 
 ## What Is NOT Published
