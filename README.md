@@ -218,7 +218,7 @@ The application hardcodes several API keys used for its infrastructure. Values a
 
 - C2 domain: `opppi[.]com`
 - Image domain: `image[.]opppi[.]com`
-- Subdomain: `test.opppi[.]com`
+- Subdomain: `test.opppi[.]com` (historically active, cert issued 2025-11-19, currently no DNS record)
 - USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
 - Skype ID: `yuan.zi4`
 - Support email: `Onlinedating999[.]@proton[.]me`
