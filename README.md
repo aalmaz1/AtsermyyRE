@@ -338,7 +338,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 - Payment C2 domain: `0nlinepay[.]com` (homoglyph of "onlinepay"; hardcoded base64 in `Base64Utils.smali`)
 - Payment API path: `https://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
-- Hardcoded `api_token`: `B13B-6D71-4EF5-88FA-F32781734A7F` (used in upload/S3 requests)
+- Hardcoded `api_token`: `B13B-(redacted; full value available on request for verified researchers)A7F` (used in upload/S3 requests)
 
 ### APK Signing Certificate (Developer Identity)
 
