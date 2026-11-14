@@ -217,7 +217,7 @@ Static analysis of the decompiled code revealed direct links to the operators an
 - **Blockchain Activity:** The wallet has 4,335 lifetime transactions but has been **inactive for the last 180 days**. Historical interactions show direct transfers from **OKX exchange** (KYC-trail), indicating a burner address strategy where operators rotate wallets dynamically.
 - **Operator Contact (Skype):** `yuan.zi4` 
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
-- **Email:** `Onlinedating999@proton.me`
+- **Email:** `Onlinedating999[@]proton[.]me`
 - **Image CDN:** `hxxp://image[.]opppi[.]com/`
 
 ### Hardcoded Payment Gateway (Homoglyph Domain)
@@ -298,7 +298,7 @@ The application hardcodes several API keys used for its infrastructure. Values a
 - **AWS Access Key:** `AKIA...` *(Used for S3 bucket `hk-attach`)*
 - **Firebase Project:** `ccatsov` 
   *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
-- **AWS IP Check:** `https://checkip[.]amazonaws[.]com` *(Used to track victim's real IP)*
+- **AWS IP Check:** `hxxps://checkip[.]amazonaws[.]com` *(Used to track victim's real IP)*
 
 ### Resources & Assets Analysis
 
@@ -337,7 +337,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - Subdomain: `test[.]opppi[.]com` (historically active, cert issued 2025-11-19, currently no DNS record)
 - USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
 - Skype ID: `yuan.zi4`
-- Support email: `Onlinedating999[.]@proton[.]me`
+- Support email: `Onlinedating999[@]proton[.]me`
 - S3 bucket: `hk-attach` (region `ap-east-1`)
 - S3 prefix: `privatealbum`
 - SharedPreferences file: `MyInformation`
@@ -359,17 +359,19 @@ Analysis of `META-INF/CERT.RSA` reveals the signing certificate used to build th
 
 **OSINT Note:** The operators spoofed **Tiendanube** — the largest e-commerce platform in Latin America (HQ in Buenos Aires). This explains why the app's Terms of Service mention *"Argentine law"* as the governing jurisdiction. The certificate was issued on **September 15, 2026** — one month before the scam attempt, indicating fresh infrastructure built specifically for this campaign.
 
+**Disclaimer:** Tiendanube is a legitimate e-commerce platform and is **not involved** in this campaign in any way. The certificate subject was **spoofed by the operators** to impersonate the company. This mention is provided solely to document the impersonation technique observed in the APK.
+
 ### OSINT Verification Status
 
 To ensure the accuracy of the extracted indicators, several external checks were performed:
 
 - **APK Certificate SHA-256:** Queried on VirusTotal. Result: **No matches found** (indicates a unique keystore, likely generated specifically for this campaign or not yet indexed by AV engines).
-- **Firebase Project (`ccatsov`):** Checked `ccatsov.firebaseio.com/.json`. Result: **404 Not Found** (indicates the Realtime Database is either disabled or does not exist; the project likely only uses FCM for push notifications).
+- **Firebase Project (`ccatsov`):** Checked `ccatsov[.]firebaseio[.]com/.json`. Result: **404 Not Found** (indicates the Realtime Database is either disabled or does not exist; the project likely only uses FCM for push notifications).
 - **Skype ID (`yuan.zi4`):** Searched via Google and public databases. Result: **No public scam reports or correlations found at the time of check.**
 
 ### Dropper / Self-Update Capability
 
-`WelcomeActivity` contains a downloader that fetches an APK from the C2 (`opppi.com`) and silently installs it:
+`WelcomeActivity` contains a downloader that fetches an APK from the C2 (`opppi[.]com`) and silently installs it:
 
 - Downloads to `/sdcard/download/` via `HttpURLConnection`
 - Uses intent `application/vnd.android.package-archive` with `FLAG_ACTIVITY_NEW_TASK`
@@ -385,7 +387,7 @@ To ensure the accuracy of the extracted indicators, several external checks were
 To detect this specific campaign or similar threats:
 
 **Network:**
-- Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5.cloudfront.net`.
+- Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5[.]cloudfront[.]net`.
 - Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
 
 **Endpoint (Android):**
@@ -415,7 +417,7 @@ rule RomanceScam_FeiQQ_APK {
         uint32(0) == 0x04034b50 and 2 of them
 }
 ```
-
+> *Note: YARA strings are intentionally left un-defanged, because the rule must match the literal bytes in the sample. All network indicators elsewhere in this document are defanged.*
 ---
 
 ## What Is NOT Published
@@ -438,7 +440,7 @@ through professional malware-sharing platforms (e.g. MalwareBazaar, VirusTotal).
 - If the app was already installed: do not top up any balance, remove the app,
   and change passwords used in it.
 - Report the sample to the hosting provider of `opppi[.]com`, to AWS
-  (`abuse@amazonaws[.]com`) and to the relevant law-enforcement authority.
+  (`abuse[@]amazonaws[.]com`) and to the relevant law-enforcement authority.
 
 ---
 
