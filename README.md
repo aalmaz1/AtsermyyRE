@@ -191,7 +191,6 @@ requests can be forged.
 
 The observed behavior maps to the following MITRE ATT&CK techniques:
 
-```markdown
 - **T1626:** Abuse Elevation Control Mechanism (exported window-manager service)
 - **T1516:** Input Injection (potential via `PHONE_CONTROL_USER` + `SYSTEM_ALERT_WINDOW`)
 - **T1417:** Input Capture (fake investment forms capturing card data and CVV)
