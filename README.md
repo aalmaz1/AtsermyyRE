@@ -192,19 +192,26 @@ requests can be forged.
 
 ---
 
-## MITRE ATT&CK Mapping
+## 🎯 MITRE ATT&CK for Mobile Mapping
 
-The observed behavior maps to the following MITRE ATT&CK techniques:
+The following table maps the observed artifacts and malicious functionality of the `com.FeiQQ.FeiQQ` application to the official **MITRE ATT&CK for Mobile** matrix. Each technique is validated against the official MITRE definition and supported by concrete evidence from the APK.
 
-- **T1626:** Abuse Elevation Control Mechanism (exported window-manager service)
-- **T1516:** Input Injection (potential via `PHONE_CONTROL_USER` + `SYSTEM_ALERT_WINDOW`)
-- **T1417:** Input Capture (fake investment forms capturing card data and CVV)
-- **T1409:** Stored Application Data (credentials and tokens stored in plaintext SharedPreferences)
-- **T1521:** Encrypted Channel (partially bypassed due to `usesCleartextTraffic="true"`)
-- **T1584:** Compromise Infrastructure (usage of Amazon CloudFront/Route53 to hide C2)
-- **T1428:** Exploitation for Client Execution (requesting `REQUEST_INSTALL_PACKAGES` for further payloads)
-- **T1417.001:** Input Capture — Keylogging (WebView with JS enabled in `VisaWebActivity`)
-- **T1539:** Steal Web Session Cookie (via WebView)
+| Tactic | Technique ID | Technique Name | Evidence in APK |
+| :--- | :--- | :--- | :--- |
+| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | APK distributed outside official stores (side-loading via messengers) and `REQUEST_INSTALL_PACKAGES` permission for installing additional payloads. |
+| **Execution** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Auto-start on boot via `RECEIVE_BOOT_COMPLETED` and handling of system events (`USER_PRESENT`, `POWER_CONNECTED/DISCONNECTED`). |
+| **Persistence** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Persistence via Broadcast Receivers (`PushReceiver`, `FirebaseInstanceIdReceiver`). |
+| **Defense Evasion** | **[T1406](https://attack.mitre.org/techniques/T1406/)** | Obfuscated Files or Information | Base64-encoded payment URLs (`aHR0cHM6Ly8wbmxpbmVwYXku...` → `https://0nlinepay[.]com/...` in `Base64Utils.smali`). |
+| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | Phishing overlays and input capture over other apps via `SYSTEM_ALERT_WINDOW` and the `MyWindowmanagerServiceRong` service. |
+| | **[T1409](https://attack.mitre.org/techniques/T1409/)** | Access Stored Application Data | Plaintext storage of session tokens, credentials, and configuration in `SharedPreferences("MyInformation")`. |
+| **Discovery** | **[T1426](https://attack.mitre.org/techniques/T1426/)** | System Information Discovery | Collection of device identifiers (`Build.MODEL`, `Build.VERSION.RELEASE`, `TelephonyManager`) in `WelcomeActivity.smali` and `NewTaskActivity.smali`. |
+| | **[T1420](https://attack.mitre.org/techniques/T1420/)** | File and Directory Discovery | Request for direct filesystem access via `MANAGE_EXTERNAL_STORAGE` and `READ/WRITE_EXTERNAL_STORAGE`. |
+| | **[T1430](https://attack.mitre.org/techniques/T1430/)** | Location Tracking | Request for precise and approximate location via `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`. |
+| **Collection** | **[T1429](https://attack.mitre.org/techniques/T1429/)** | Audio Capture | Microphone audio recording via `RECORD_AUDIO` permission. |
+| **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | Command and control and data exfiltration over HTTP/HTTPS to `https://www[.]opppi[.]com/api.php` via `AbHttpUtil`. |
+| | **[T1481](https://attack.mitre.org/techniques/T1481/)** | Web Service | Use of third-party infrastructure (RongCloud RTC/IM, Firebase Messaging) for push commands and message delivery. |
+| | **[T1521](https://attack.mitre.org/techniques/T1521/)** | Encrypted Channel | Use of weak DES encryption (`ChatActivity.smali`, `ChatRongActivity.smali`) to obfuscate message traffic. |
+| **Privilege Escalation** | **[T1626](https://attack.mitre.org/techniques/T1626/)** | Abuse Elevation Control Mechanism | Exported `MyWindowmanagerServiceRong` service combined with `SYSTEM_ALERT_WINDOW` and the C2 command `phone_control_user` as part of a privilege-abuse chain. |
 
 ---
 
