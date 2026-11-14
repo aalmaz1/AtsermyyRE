@@ -173,21 +173,47 @@ The observed behavior maps to the following MITRE ATT&CK techniques:
 - **T1584:** Compromise Infrastructure (usage of Amazon CloudFront/Route53 to hide C2)
 - **T1428:** Exploitation for Client Execution (requesting `REQUEST_INSTALL_PACKAGES` for further payloads)
 
+
+
+
+## OSINT Findings (Extracted Artifacts)
+
+Static analysis of the decompiled code revealed direct links to the operators and their financial infrastructure:
+
+- **Crypto Wallet (USDT TRC-20):** `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro` 
+  *(Hardcoded in `Usd_Activity` for victim deposits. Trackable via Tronscan).*
+- **Blockchain Activity:** The wallet has 4,335 lifetime transactions but has been **inactive for the last 180 days**. Historical interactions show direct transfers from **OKX exchange** (KYC-trail), indicating a burner address strategy where operators rotate wallets dynamically.
+- **Operator Contact (Skype):** `yuan.zi4` 
+  *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
+- **Email:** `Onlinedating999@proton.me`
+- **Image CDN:** `http://image.opppi.com/`
+
+### Cloud & Infrastructure Keys (Redacted)
+The application hardcodes several API keys used for its infrastructure. Values are partially redacted for ethical disclosure:
+
+- **RongCloud App Key:** `n19jm...` *(Used for IM and video calls)*
+- **AWS Access Key:** `AKIA...` *(Used for S3 bucket `hk-attach`)*
+- **Firebase Project:** `ccatsov` 
+  *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
+- **AWS IP Check:** `https://checkip.amazonaws.com` *(Used to track victim's real IP)*
+
+---
+
 ## Indicators of Compromise (IOCs)
 
 > Defanged for safety.
 
 - C2 domain: `opppi[.]com`
-- API path: `https://www.opppi[.]com/api.php`
+- Image domain: `image[.]opppi[.]com`
+- USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
+- Skype ID: `yuan.zi4`
+- Support email: `Onlinedating999[.]@proton[.]me`
 - S3 bucket: `hk-attach` (region `ap-east-1`)
 - S3 prefix: `privatealbum`
-- Support email: `Onlinedating999[.]@proton[.]me`
 - SharedPreferences file: `MyInformation`
 - IM provider: RongCloud (`io.rong.*`)
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
-
----
 
 ## Detection & Hunting
 
@@ -222,43 +248,7 @@ rule RomanceScam_FeiQQ_APK {
         uint32(0) == 0x04034b50 and 2 of them
 }
 ```
-## OSINT Findings (Extracted Artifacts)
 
-Static analysis of the decompiled code revealed direct links to the operators and their financial infrastructure:
-
-- **Crypto Wallet (USDT TRC-20):** `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro` 
-  *(Hardcoded in `Usd_Activity` for victim deposits. Trackable via Tronscan).*
-- **Operator Contact (Skype):** `yuan.zi4` 
-  *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
-- **Email:** `Onlinedating999@proton.me`
-- **Image CDN:** `http://image.opppi.com/`
-
-### Cloud & Infrastructure Keys (Redacted)
-The application hardcodes several API keys used for its infrastructure. Values are partially redacted for ethical disclosure:
-
-- **RongCloud App Key:** `n19jm...` *(Used for IM and video calls)*
-- **AWS Access Key:** `AKIA...` *(Used for S3 bucket `hk-attach`)*
-- **Firebase Project:** `ccatsov` 
-  *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
-- **AWS IP Check:** `https://checkip.amazonaws.com` *(Used to track victim's real IP)*
-
----
-
-## Indicators of Compromise (IOCs)
-
-> Defanged for safety.
-
-- C2 domain: `opppi[.]com`
-- Image domain: `image[.]opppi[.]com`
-- USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
-- Skype ID: `yuan.zi4`
-- Support email: `Onlinedating999[.]@proton[.]me`
-- S3 bucket: `hk-attach` (region `ap-east-1`)
-- S3 prefix: `privatealbum`
-- SharedPreferences file: `MyInformation`
-- IM provider: RongCloud (`io.rong.*`)
-- Package name: `com.FeiQQ.FeiQQ`
-- SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 
 ## What Is NOT Published
 
