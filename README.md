@@ -1,12 +1,88 @@
 # AtsermyyRE
-# Romance Scam APK Analysis — Pig Butchering (杀猪盘)
+
+### Android Malware Analysis — Romance Scam / Pig Butchering (杀猪盘) APK
+
+[![Sample](https://img.shields.io/badge/sample-com.FeiQQ.FeiQQ-informational)](#sample-information)
+[![Analysis](https://img.shields.io/badge/analysis-static-success)](#scope--limitations)
+[![Status](https://img.shields.io/badge/infrastructure-mitigated_by_AWS-brightgreen)](#sample-information)
+[![YARA](https://img.shields.io/badge/YARA-rule_included-orange)](#yara-rule)
+[![License](https://img.shields.io/badge/license-CC0_1.0-lightgrey)](LICENSE)
 
 > **DISCLAIMER**
 > This repository contains the results of **static analysis** of a suspicious Android application
 > distributed via a romance scam. **The APK sample is NOT distributed here.** No malicious code,
-> no hardcoded credentials, and no personal data are published.
+> no working credentials, and no personal data of victims are published; secrets observed in
+> the binary are partially redacted or disclosed only as non-functional indicator fragments.
 > This material is provided for **educational and defensive purposes only**.
 > If you received a similar APK — do not install it, do not run it, and report it.
+
+---
+
+## Table of Contents
+
+- [Scope & Limitations](#scope--limitations) · [What This Write-up Demonstrates](#what-this-write-up-demonstrates) · [TL;DR / Key Findings](#tldr--key-findings)
+- [Executive Summary](#executive-summary) · [Sample Information](#sample-information) · [Campaign Timeline](#campaign-timeline)
+- [Manifest Analysis](#manifest-analysis) · [Hidden Investment Module](#hidden-investment-module) · [Data Collected and Stored Insecurely](#data-collected-and-stored-insecurely)
+- [Cloud Storage (AWS S3)](#cloud-storage-aws-s3) · [API Authentication Weakness](#api-authentication-weakness) · [MITRE ATT&CK Mapping](#mitre-attck-mapping)
+- [OSINT Findings](#osint-findings-extracted-artifacts) · [Indicators of Compromise (IOCs)](#indicators-of-compromise-iocs)
+- [Detection & Hunting](#detection--hunting) · [YARA Rule](#yara-rule) · [What Is NOT Published](#what-is-not-published) · [Recommendations](#recommendations)
+
+---
+
+## Scope & Limitations
+
+Being explicit about what was and was not done — for readers who want to weigh
+the evidence themselves.
+
+| Aspect | Status |
+|---|---|
+| Analysis type | **Static only** (jadx, apktool, smali, resource review) |
+| Dynamic analysis (emulator, Frida, traffic capture) | **Not performed** — sample was not executed |
+| Runtime C2 behavior | **Inferred** from code paths, not observed |
+| Sample handling | APK not redistributed; hash provided for independent acquisition |
+| Data sanitization | Credentials partially redacted; no victim PII published |
+| Infrastructure takedown | Reported to AWS / registry; AWS confirmed mitigation |
+
+Consequence: statements about *what the app does at runtime* are conclusions drawn
+from code and configuration, not from observed network traffic. Where a finding is
+an inference rather than a direct observation, the wording says so
+("suggests", "potential", "likely").
+
+## What This Write-up Demonstrates
+
+For anyone reviewing this as work sample, the analysis covers the full workflow
+from a single unknown APK to an actionable, shareable intelligence product:
+
+- **Reverse engineering:** Android APK unpacking (`apktool`), decompilation (jadx),
+  smali-level reading of `Constant.smali`, `Base64Utils.smali`, `WelcomeActivity`.
+- **Manifest & attack-surface review:** exported components, dangerous permissions,
+  insecure flags, backup/extraction rules, target SDK downgrade.
+- **Malware tradecraft recognition:** dropper/self-update logic, hidden investment
+  module bolted onto a dating app, overlay + remote-control vector, plaintext
+  credential storage, weak DES crypto, WebView phishing surface.
+- **OSINT & infrastructure pivoting:** Certificate Transparency (crt.sh), WHOIS,
+  Wayback Machine, URLScan, VirusTotal, blockchain tracing of a USDT wallet,
+  homoglyph domain detection, APK signing-certificate attribution.
+- **Attribution triage:** fake "Tiendanube" signing identity, certificate issue date
+  vs. incident date, burner-wallet rotation pattern.
+- **Defensive output:** MITRE ATT&CK mapping, IOC list (defanged), hunting queries,
+  and a YARA rule usable by other analysts.
+- **Responsible handling:** no sample redistribution, redacted secrets, no victim
+  PII, coordinated report to the hosting provider.
+
+## TL;DR / Key Findings
+
+| Severity | Finding |
+|---|---|
+| Critical | Hidden USDT "investment" module (`mod=Capital`) behind a dating UI — pig butchering core |
+| Critical | Full payment card capture incl. CVV, plus dropper that installs further APKs from C2 |
+| Critical | Password, AWS keys, STS and API tokens stored **plaintext** in `SharedPreferences("MyInformation")` |
+| High | Exported window-manager service + `SYSTEM_ALERT_WINDOW` → overlay/remote-control vector |
+| High | `targetSdkVersion=28`, `MANAGE_EXTERNAL_STORAGE`, `allowBackup=true` — deliberate legacy-config abuse |
+| High | Requests signed with `MD5(mod+act+version+token)` — forgeable once the plaintext token leaks |
+| Medium | Homoglyph payment domain `0nlinepay[.]com` hardcoded as base64 |
+| Medium | DES-encrypted chat, JS-enabled WebViews (`VisaWebActivity`) |
+| — | No anti-analysis (no root/emulator/Frida checks) — typical for scamware, not banking trojans |
 
 ---
 
@@ -39,11 +115,34 @@ The application also collects **full payment card data** and stores the user's
 | Incident Date | October 19, 2026 (date of the scam attempt) |
 | **Infrastructure Status** | **Mitigated by AWS (Case #179395433200804)** |
 
-**Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `DNS propagation check`, `WHOIS`.
+**Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `crt.sh`, `WHOIS`, `Wayback Machine`, `URLScan.io`, `VirusTotal`, `Tronscan`.
 
 **Case Status:** Reported to AWS Trust & Safety. AWS confirmed that the malicious infrastructure (CloudFront/Route 53) has been **mitigated** (Case #179395433200804).
+
 ![AWS Mitigation Confirmation](images/aws_migration.png)
 *Official confirmation from AWS Trust & Safety that the reported infrastructure was mitigated.*
+
+---
+
+## Campaign Timeline
+
+The dates recovered during the analysis form a coherent build-out sequence for a
+single campaign:
+
+| Date | Event | Source |
+|---|---|---|
+| 2022-06 | First TLS certificates for `opppi[.]com` — infrastructure predates this campaign | crt.sh |
+| 2023–2025 | Certificates reissued via Amazon CA — continued, low-profile hosting | crt.sh |
+| 2025-11-19 | Certificate issued for `test.opppi[.]com` (staging/admin panel); no DNS record today | crt.sh, URLScan |
+| 2026-09-15 | APK signing certificate minted under spoofed `O=Tiendanube` identity | `META-INF/CERT.RSA` |
+| 2026-10-19 | Scam attempt: app sent via messenger, installation suggested | Incident |
+| 2026-10-2x | Static analysis, OSINT pivoting, IOC extraction | This work |
+| 2026-11-06 | YARA rule and write-up published; report filed with AWS | This work |
+| 2026-11-xx | AWS Trust & Safety confirms mitigation (Case #179395433200804) | Email above |
+
+Reading: the operators reuse a long-lived domain (2022) while minting **fresh signing
+certificates per campaign** (2026-09-15, one month before the attempt) — infrastructure
+age and operator age are deliberately decoupled.
 
 ---
 
@@ -209,7 +308,7 @@ Static analysis of the decompiled code revealed direct links to the operators an
 - **Blockchain Activity:** The wallet has 4,335 lifetime transactions but has been **inactive for the last 180 days**. Historical interactions show direct transfers from **OKX exchange** (KYC-trail), indicating a burner address strategy where operators rotate wallets dynamically.
 - **Operator Contact (Skype):** `yuan.zi4` 
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
-- **Email:** `Onlinedating999@proton.me`
+- **Email:** `Onlinedating999[.]@proton[.]me`
 - **Image CDN:** `http://image.opppi.com/`
 
 ### Hardcoded Payment Gateway (Homoglyph Domain)
@@ -244,6 +343,15 @@ All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap
 | `Translate` | `language_to`, `special_language_to` | Translation |
 | `Push` | `register`, `unbind` | FCM/RongCloud push |
 | `WebMessage` | `pl`, `zan`, `atme` | Web notifications |
+| `Pay` | `score_transfer_api` | Paid phone calls / balance transfer |
+| `Friend` | `getUserBlackList` | Blacklist management |
+| `Collection` | `addColl`, `collList`, `delColln` | Favourites / collections |
+| `Channel` | `doChannel` | Channel / group listings |
+| `FeedDogg` | `doDogg` | Feed interactions |
+| `Turntable` | `confirmLottery` | Lottery / spin-to-win |
+
+![API surface in Constant.smali](images/constant_c2.png)
+*Additional endpoints in `Constant.smali` — note the payment, collection and lottery modules.*
 
 ### Remote Phone Control Endpoint
 
@@ -376,13 +484,32 @@ To ensure the accuracy of the extracted indicators, several external checks were
 
 To detect this specific campaign or similar threats:
 
-**Network:**
+**Network (proxy / DNS / NDR):**
 - Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5.cloudfront.net`.
-- Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
+- Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=` (investment module) or `mod=Upload&act=get_sts_token` (AWS credential hand-out).
+- Alert on requests to `0nlinepay[.]com` — note the digit `0`, so a naive `*onlinepay*` pattern will miss it.
+- Sigma-style logic (pseudo):
 
-**Endpoint (Android):**
+```yaml
+title: FeiQQ scamware C2 beacon
+detection:
+  selection_proxy:
+    url|contains:
+      - 'opppi.com/api.php'
+      - '0nlinepay.com/Payment/'
+  selection_body:
+    request_body|contains: 'mod=Capital&act='
+  condition: selection_proxy or selection_body
+```
+
+**Endpoint (Android / MDM / EDR):**
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
-- Check `SharedPreferences("MyInformation")` for plaintext keys like `credit_card_number` or `osskey`.
+- Check `SharedPreferences("MyInformation")` for plaintext keys like `credit_card_number`, `pass`, `osskey`, `osssecre`, `securityToken`, `api_token_str`.
+- Alert on APKs targeting `targetSdkVersion=28` that also request `MANAGE_EXTERNAL_STORAGE` + `SYSTEM_ALERT_WINDOW` + `REQUEST_INSTALL_PACKAGES` — this combination alone is a strong scamware/dropper heuristic for sideloaded dating/finance apps.
+- Watch `/sdcard/download/` for APKs fetched by a messenger-installed app (dropper behavior in `WelcomeActivity`).
+
+**YARA / scanning:**
+- Apply the rule below to APK corpora or malware feeds; it requires an APK/ZIP header plus `2 of 4` unique strings, so it survives minor repackaging while still being specific to this builder's artefacts.
 
 ---
 
