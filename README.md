@@ -249,9 +249,7 @@ All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap
 
 `MyWindowmanagerServiceRong.smali:18` defines:
 
-```text
 PHONE_CONTROL_USER = "https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
-```
 
 This endpoint is named **`phone_control_user`** (under `mod=Receive`). Combined with the **exported** `MyWindowmanagerServiceRong` service and `SYSTEM_ALERT_WINDOW` permission, this is a potential **remote-control / overlay-injection vector**.
 
