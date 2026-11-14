@@ -55,11 +55,19 @@ The application also collects **full payment card data** and stores the user's
 Key findings from `AndroidManifest.xml`:
 
 - `MANAGE_EXTERNAL_STORAGE` — access to **all** files on the device, not just user-selected ones.
-- `SYSTEM_ALERT_WINDOW` / `SYSTEM_OVERLAY_WINDOW` — draw overlays over other apps (clickjacking / phishing).
+- `SYSTEM_ALERT_WINDOW` — real Android permission; allows drawing overlays over other apps
+  (clickjacking / phishing risk).
+- `SYSTEM_OVERLAY_WINDOW` — **non-standard / non-existent permission name**; declared in the
+  manifest but ignored by Android and grants no rights. Likely a developer typo or a legacy
+  custom-ROM artifact. It does **not** add overlay capability beyond `SYSTEM_ALERT_WINDOW`.
 - `REQUEST_INSTALL_PACKAGES` — install additional APKs outside Google Play.
 - `RECEIVE_BOOT_COMPLETED` — auto-start after reboot.
 - `DISABLE_KEYGUARD` — dismiss the lock screen.
-- `READ_PHONE_STATE`, `GET_TASKS`, `REAL_GET_TASKS` — device identifiers and running processes.
+- `READ_PHONE_STATE` — device identifiers.
+- `REAL_GET_TASKS` (signature|privileged) and `GET_TASKS` (deprecated since API 21) are
+  **declared but not grantable to third-party apps on modern Android**. They may only matter
+  on very old devices / legacy APIs. Their presence is suspicious, but it does not by itself
+  prove access to running processes.
 - `RECORD_AUDIO`, `CAMERA`, `ACCESS_FINE_LOCATION` — microphone, camera, precise location.
 
 ![Insecure application settings](images/manifest_application.png)
@@ -210,7 +218,7 @@ Static analysis of the decompiled code revealed direct links to the operators an
 - **Operator Contact (Skype):** `yuan.zi4` 
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
 - **Email:** `Onlinedating999@proton.me`
-- **Image CDN:** `http://image.opppi.com/`
+- **Image CDN:** `http://image[.]opppi[.]com/`
 
 ### Hardcoded Payment Gateway (Homoglyph Domain)
 
@@ -269,17 +277,17 @@ No root, emulator, Frida, Xposed, Magisk, QEMU, or `ptrace` checks were found in
 
 Analysis of Certificate Transparency logs (crt.sh) revealed the following subdomains and historical context:
 
-- **Discovered Subdomains:** `www.opppi[.]com`, `image.opppi[.]com`, **`test.opppi[.]com`** (new IOC).
+- **Discovered Subdomains:** `www[.]opppi[.]com`, `image[.]opppi[.]com`, **`test[.]opppi[.]com`** (new IOC).
 - **Timeline:** Certificates for `opppi[.]com` date back to **June 2022**, indicating long-term infrastructure usage.
 - **CA History:** The operators used multiple Certificate Authorities (TrustAsia in 2022, Amazon in 2023-2025, Sectigo in 2026), likely to evade blocklists.
 
-**Note on `test.opppi[.]com`:** A TLS certificate for this subdomain was issued on **2025-11-19** (Amazon RSA 2048 M01), but the DNS record **currently does not resolve** (confirmed via URLScan.io). This indicates the subdomain existed at some point (possibly a staging or admin panel) and was later removed — a common operational security practice to erase traces. The certificate, however, remains permanently in CT logs.
+**Note on `test[.]opppi[.]com`:** A TLS certificate for this subdomain was issued on **2025-11-19** (Amazon RSA 2048 M01), but the DNS record **currently does not resolve** (confirmed via URLScan.io). This indicates the subdomain existed at some point (possibly a staging or admin panel) and was later removed — a common operational security practice to erase traces. The certificate, however, remains permanently in CT logs.
 
 ### AWS S3 Bucket Confirmation (via Wayback Machine)
 
-Historical snapshots of `image.opppi[.]com` on the Wayback Machine revealed an **AWS S3 `AccessDenied` XML error**. 
+Historical snapshots of `image[.]opppi[.]com` on the Wayback Machine revealed an **AWS S3 `AccessDenied` XML error**. 
 
-- This confirms that `image.opppi[.]com` is a **custom domain mapped to an AWS S3 bucket**.
+- This confirms that `image[.]opppi[.]com` is a **custom domain mapped to an AWS S3 bucket**.
 - The "AccessDenied" response means the bucket exists but public listing is blocked, corroborating the static analysis finding that user photos are stored in the `hk-attach` S3 bucket.
 
 ### Cloud & Infrastructure Keys (Redacted)
@@ -290,11 +298,11 @@ The application hardcodes several API keys used for its infrastructure. Values a
 - **AWS Access Key:** `AKIA...` *(Used for S3 bucket `hk-attach`)*
 - **Firebase Project:** `ccatsov` 
   *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
-- **AWS IP Check:** `https://checkip.amazonaws.com` *(Used to track victim's real IP)*
+- **AWS IP Check:** `https://checkip[.]amazonaws[.]com` *(Used to track victim's real IP)*
 
 ### Resources & Assets Analysis
 
-Static review of `res/` and `assets/` revealed **no additional external endpoints or C2 domains** beyond `opppi[.]com` and `image.opppi[.]com`.
+Static review of `res/` and `assets/` revealed **no additional external endpoints or C2 domains** beyond `opppi[.]com` and `image[.]opppi[.]com`.
 
 Key artifacts:
 
@@ -326,7 +334,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 
 - C2 domain: `opppi[.]com`
 - Image domain: `image[.]opppi[.]com`
-- Subdomain: `test.opppi[.]com` (historically active, cert issued 2025-11-19, currently no DNS record)
+- Subdomain: `test[.]opppi[.]com` (historically active, cert issued 2025-11-19, currently no DNS record)
 - USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
 - Skype ID: `yuan.zi4`
 - Support email: `Onlinedating999[.]@proton[.]me`
@@ -337,7 +345,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 - Payment C2 domain: `0nlinepay[.]com` (homoglyph of "onlinepay"; hardcoded base64 in `Base64Utils.smali`)
-- Payment API path: `https://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
+- Payment API path: `hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
 - Hardcoded `api_token`: `B13B-(redacted; full value available on request for verified researchers)A7F` (used in upload/S3 requests)
 
 ### APK Signing Certificate (Developer Identity)
