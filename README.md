@@ -70,7 +70,6 @@ Key findings from `AndroidManifest.xml`:
 - `usesCleartextTraffic="true"` — HTTP without encryption is allowed.
 - `exported="true"` on `MyWindowmanagerServiceRong` — the service is reachable from other apps.
 
----
 ### Exported Components (Attack Surface)
 
 - **`com.FeiQQ.FeiQQ.ui.Topic_im_new_Activity`** — explicitly `exported="true"` with **no intent filter**. Any app on the device can launch this activity directly. This is a potential intent-redirection vector.
@@ -95,6 +94,8 @@ Key findings from `AndroidManifest.xml`:
 | `fullBackupContent` | not found |
 | `dataExtractionRules` | not found |
 | `networkSecurityConfig` | not found |
+
+---
 
 ## Hidden Investment Module
 
@@ -122,12 +123,10 @@ mod=Capital&act=getUserWithdrawLogs
 mod=Capital&act=getUserCapitalInfo
 ```
 
-
 ![Capital API endpoints](images/constant_capital.png)
 *Investment API endpoints in `Constant.smali`.*
 
 ![Investment strings](images/strings_changtou.png)
-
 *Localized strings of the investment module (`usdt 起購`, `世界金融產品理財`, `Expected T+1 arrival`).*
 
 The field `only_usdt` in `PMyInformation` indicates the app is designed to work
@@ -158,7 +157,6 @@ Additional issues:
 - `toString()` prints **all** fields, including password, card number and CVV —
   a leak risk if logged.
 
-
 ---
 
 ## Cloud Storage (AWS S3)
@@ -180,7 +178,6 @@ API requests are signed as:
 api_token = MD5( mod + act + api_version + api_token_str )
 ```
 
-
 This is a plain MD5 over a predictable concatenation, without a server-side secret.
 If `api_token_str` leaks (and it is stored in plaintext on the device),
 requests can be forged.
@@ -201,7 +198,7 @@ The observed behavior maps to the following MITRE ATT&CK techniques:
 - **T1417.001:** Input Capture — Keylogging (WebView with JS enabled in `VisaWebActivity`)
 - **T1539:** Steal Web Session Cookie (via WebView)
 
-
+---
 
 ## OSINT Findings (Extracted Artifacts)
 
@@ -214,7 +211,19 @@ Static analysis of the decompiled code revealed direct links to the operators an
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
 - **Email:** `Onlinedating999@proton.me`
 - **Image CDN:** `http://image.opppi.com/`
+
 ### Hardcoded Payment Gateway (Homoglyph Domain)
+
+Static analysis of `Base64Utils.smali` revealed a base64-encoded URL that decodes to:
+
+```text
+https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
+```
+
+- **Homoglyph trick:** `0nlinepay` uses digit `0` instead of letter `o` to impersonate "onlinepay".
+- **Purpose:** This is a separate payment-processing endpoint, distinct from `opppi[.]com`. Likely used for card-not-present transactions or a secondary cash-out channel.
+- **Sample order ID:** `2802101131145720` (can be used as a pivot for OSINT).
+
 ### API Surface (Grouped by `mod`)
 
 All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap=2&client_id=1&abc=1`. Endpoints are grouped by `mod`:
@@ -242,17 +251,9 @@ All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap
 
 ```text
 PHONE_CONTROL_USER = "https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
+```
 
-This endpoint is named phone_control_user (under mod=Receive). Combined with the exported MyWindowmanagerServiceRong service and SYSTEM_ALERT_WINDOW permission, this is a potential remote-control / overlay-injection vector. The exact act value is not visible in the snippet, but the naming is self-explanatory.
-
-
-
-Static analysis of `Base64Utils.smali` revealed a base64-encoded URL that decodes to:
-https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
-
-- **Homoglyph trick:** `0nlinepay` uses digit `0` instead of letter `o` to impersonate "onlinepay".
-- **Purpose:** This is a separate payment-processing endpoint, distinct from `opppi[.]com`. Likely used for card-not-present transactions or a secondary cash-out channel.
-- **Sample order ID:** `2802101131145720` (can be used as a pivot for OSINT).
+This endpoint is named **`phone_control_user`** (under `mod=Receive`). Combined with the **exported** `MyWindowmanagerServiceRong` service and `SYSTEM_ALERT_WINDOW` permission, this is a potential **remote-control / overlay-injection vector**.
 
 ### Weak Encryption & WebView Configuration
 
@@ -265,7 +266,9 @@ https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
 No root, emulator, Frida, Xposed, Magisk, QEMU, or `ptrace` checks were found in smali. This is unusual for banking trojans but consistent with **scamware** — the operators don't expect the victim to be a researcher, so they skip anti-analysis.
 
 ### Certificate Transparency & Subdomain Discovery
+
 Analysis of Certificate Transparency logs (crt.sh) revealed the following subdomains and historical context:
+
 - **Discovered Subdomains:** `www.opppi[.]com`, `image.opppi[.]com`, **`test.opppi[.]com`** (new IOC).
 - **Timeline:** Certificates for `opppi[.]com` date back to **June 2022**, indicating long-term infrastructure usage.
 - **CA History:** The operators used multiple Certificate Authorities (TrustAsia in 2022, Amazon in 2023-2025, Sectigo in 2026), likely to evade blocklists.
@@ -273,11 +276,14 @@ Analysis of Certificate Transparency logs (crt.sh) revealed the following subdom
 **Note on `test.opppi[.]com`:** A TLS certificate for this subdomain was issued on **2025-11-19** (Amazon RSA 2048 M01), but the DNS record **currently does not resolve** (confirmed via URLScan.io). This indicates the subdomain existed at some point (possibly a staging or admin panel) and was later removed — a common operational security practice to erase traces. The certificate, however, remains permanently in CT logs.
 
 ### AWS S3 Bucket Confirmation (via Wayback Machine)
+
 Historical snapshots of `image.opppi[.]com` on the Wayback Machine revealed an **AWS S3 `AccessDenied` XML error**. 
+
 - This confirms that `image.opppi[.]com` is a **custom domain mapped to an AWS S3 bucket**.
 - The "AccessDenied" response means the bucket exists but public listing is blocked, corroborating the static analysis finding that user photos are stored in the `hk-attach` S3 bucket.
 
 ### Cloud & Infrastructure Keys (Redacted)
+
 The application hardcodes several API keys used for its infrastructure. Values are partially redacted for ethical disclosure:
 
 - **RongCloud App Key:** `n19jm...` *(Used for IM and video calls)*
@@ -362,7 +368,9 @@ To ensure the accuracy of the extracted indicators, several external checks were
 - Requires `REQUEST_INSTALL_PACKAGES` (declared in manifest)
 - This is a classic **Dropper** pattern — the app can push new malware (banking trojan, ransomware) post-install, bypassing Google Play review.
 
-**Additional indicator:** App targets `targetSdkVersion=29` (Android 10) deliberately to bypass modern scoped-storage and permission restrictions.
+**Additional indicator:** App targets `targetSdkVersion=28` (Android 9) deliberately to bypass modern scoped-storage and permission restrictions.
+
+---
 
 ## Detection & Hunting
 
@@ -375,6 +383,8 @@ To detect this specific campaign or similar threats:
 **Endpoint (Android):**
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
 - Check `SharedPreferences("MyInformation")` for plaintext keys like `credit_card_number` or `osskey`.
+
+---
 
 ## YARA Rule
 
@@ -398,6 +408,7 @@ rule RomanceScam_FeiQQ_APK {
 }
 ```
 
+---
 
 ## What Is NOT Published
 
@@ -427,3 +438,7 @@ through professional malware-sharing platforms (e.g. MalwareBazaar, VirusTotal).
 
 This write-up is released for educational use.
 For questions or responsible disclosure — see `SECURITY.md`.
+```
+4. **`Dropper`** — `targetSdkVersion=29` → `28`.
+5. **`### API Surface`** — таблица стоит на месте, перед `### Remote Phone Control Endpoint` есть пустая строка.
+6. **`### Weak Encryption`** — стоит после `Remote Phone Control`, порядок логичный.
