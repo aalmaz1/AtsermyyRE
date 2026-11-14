@@ -226,6 +226,14 @@ Analysis of `META-INF/CERT.RSA` reveals the signing certificate used to build th
 
 **OSINT Note:** The operators spoofed **Tiendanube** — the largest e-commerce platform in Latin America (HQ in Buenos Aires). This explains why the app's Terms of Service mention *"Argentine law"* as the governing jurisdiction. The certificate was issued on **September 15, 2026** — one month before the scam attempt, indicating fresh infrastructure built specifically for this campaign.
 
+### OSINT Verification Status
+
+To ensure the accuracy of the extracted indicators, several external checks were performed:
+
+- **APK Certificate SHA-256:** Queried on VirusTotal. Result: **No matches found** (indicates a unique keystore, likely generated specifically for this campaign or not yet indexed by AV engines).
+- **Firebase Project (`ccatsov`):** Checked `ccatsov.firebaseio.com/.json`. Result: **404 Not Found** (indicates the Realtime Database is either disabled or does not exist; the project likely only uses FCM for push notifications).
+- **Skype ID (`yuan.zi4`):** Searched via Google and public databases. Result: **No public scam reports or correlations found at the time of check.**
+
 ### Dropper / Self-Update Capability
 
 `WelcomeActivity` contains a downloader that fetches an APK from the C2 (`opppi.com`) and silently installs it:
