@@ -188,6 +188,17 @@ Static analysis of the decompiled code revealed direct links to the operators an
 - **Email:** `Onlinedating999@proton.me`
 - **Image CDN:** `http://image.opppi.com/`
 
+### Certificate Transparency & Subdomain Discovery
+Analysis of Certificate Transparency logs (crt.sh) revealed the following subdomains and historical context:
+- **Discovered Subdomains:** `www.opppi[.]com`, `image.opppi[.]com`, **`test.opppi[.]com`** (new IOC).
+- **Timeline:** Certificates for `opppi[.]com` date back to **June 2022**, indicating long-term infrastructure usage.
+- **CA History:** The operators used multiple Certificate Authorities (TrustAsia in 2022, Amazon in 2023-2025, Sectigo in 2026), likely to evade blocklists.
+
+### AWS S3 Bucket Confirmation (via Wayback Machine)
+Historical snapshots of `image.opppi[.]com` on the Wayback Machine revealed an **AWS S3 `AccessDenied` XML error**. 
+- This confirms that `image.opppi[.]com` is a **custom domain mapped to an AWS S3 bucket**.
+- The "AccessDenied" response means the bucket exists but public listing is blocked, corroborating the static analysis finding that user photos are stored in the `hk-attach` S3 bucket.
+
 ### Cloud & Infrastructure Keys (Redacted)
 The application hardcodes several API keys used for its infrastructure. Values are partially redacted for ethical disclosure:
 
