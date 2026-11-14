@@ -215,6 +215,28 @@ The application hardcodes several API keys used for its infrastructure. Values a
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 
+### APK Signing Certificate (Developer Identity)
+
+Analysis of `META-INF/CERT.RSA` reveals the signing certificate used to build this APK:
+
+- **Subject/Issuer:** `C=AR, ST=Argentina, L=Buenos Aires, O=Tiendanube, OU=Tiendanube, CN=otomasse`
+- **Validity:** Sep 15, 2026 – Aug 22, 2126 (issued for 100 years — highly unusual)
+- **SHA-256:** `AD:D0:0E:3B:31:AA:43:3B:B1:01:7D:7A:73:97:20:56:45:55:C9:7B:FB:C6:58:62:FB:D8:FE:D4:C9:68:5B:43`
+- **SHA-1:** `97:EA:B9:34:83:1A:1E:9A:58:DB:36:78:EC:6E:2A:3C:47:71:FE:86`
+
+**OSINT Note:** The operators spoofed **Tiendanube** — the largest e-commerce platform in Latin America (HQ in Buenos Aires). This explains why the app's Terms of Service mention *"Argentine law"* as the governing jurisdiction. The certificate was issued on **September 15, 2026** — one month before the scam attempt, indicating fresh infrastructure built specifically for this campaign.
+
+### Dropper / Self-Update Capability
+
+`WelcomeActivity` contains a downloader that fetches an APK from the C2 (`opppi.com`) and silently installs it:
+
+- Downloads to `/sdcard/download/` via `HttpURLConnection`
+- Uses intent `application/vnd.android.package-archive` with `FLAG_ACTIVITY_NEW_TASK`
+- Requires `REQUEST_INSTALL_PACKAGES` (declared in manifest)
+- This is a classic **Dropper** pattern — the app can push new malware (banking trojan, ransomware) post-install, bypassing Google Play review.
+
+**Additional indicator:** App targets `targetSdkVersion=29` (Android 10) deliberately to bypass modern scoped-storage and permission restrictions.
+
 ## Detection & Hunting
 
 To detect this specific campaign or similar threats:
