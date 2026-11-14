@@ -214,6 +214,10 @@ The application hardcodes several API keys used for its infrastructure. Values a
 - IM provider: RongCloud (`io.rong.*`)
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
+- APK Signing Cert SHA-256: `ADD00E3B31AA433BB1017D7A739720564555C97BFBC65862FBD8FED4C9685B43`
+- APK Signing Cert Subject: `CN=otomasse, O=Tiendanube, C=AR` (spoofed)
+- Target SDK: `29` (Android 10) — deliberately outdated
+- Dropper path: `/sdcard/download/` -> `application/vnd.android.package-archive`
 
 ### APK Signing Certificate (Developer Identity)
 
