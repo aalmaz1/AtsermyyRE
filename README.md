@@ -1,7 +1,7 @@
 # AtsermyyRE
 # Romance Scam APK Analysis — Pig Butchering (杀猪盘)
 
-> **DISCLAIMER**
+> **DISCLAIMER:**
 > This repository contains the results of **static analysis** of a suspicious Android application
 > distributed via a romance scam. **The APK sample is NOT distributed here.** No malicious code,
 > no hardcoded credentials, and no personal data are published.
