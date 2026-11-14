@@ -194,6 +194,8 @@ Analysis of Certificate Transparency logs (crt.sh) revealed the following subdom
 - **Timeline:** Certificates for `opppi[.]com` date back to **June 2022**, indicating long-term infrastructure usage.
 - **CA History:** The operators used multiple Certificate Authorities (TrustAsia in 2022, Amazon in 2023-2025, Sectigo in 2026), likely to evade blocklists.
 
+**Note on `test.opppi[.]com`:** A TLS certificate for this subdomain was issued on **2025-11-19** (Amazon RSA 2048 M01), but the DNS record **currently does not resolve** (confirmed via URLScan.io). This indicates the subdomain existed at some point (possibly a staging or admin panel) and was later removed — a common operational security practice to erase traces. The certificate, however, remains permanently in CT logs.
+
 ### AWS S3 Bucket Confirmation (via Wayback Machine)
 Historical snapshots of `image.opppi[.]com` on the Wayback Machine revealed an **AWS S3 `AccessDenied` XML error**. 
 - This confirms that `image.opppi[.]com` is a **custom domain mapped to an AWS S3 bucket**.
