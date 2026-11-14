@@ -71,6 +71,30 @@ Key findings from `AndroidManifest.xml`:
 - `exported="true"` on `MyWindowmanagerServiceRong` — the service is reachable from other apps.
 
 ---
+### Exported Components (Attack Surface)
+
+- **`com.FeiQQ.FeiQQ.ui.Topic_im_new_Activity`** — explicitly `exported="true"` with **no intent filter**. Any app on the device can launch this activity directly. This is a potential intent-redirection vector.
+- **`com.FeiQQ.FeiQQ.service.MyWindowmanagerServiceRong`** — explicitly `exported="true"`. A window-management service reachable from other apps. In combination with `SYSTEM_ALERT_WINDOW`, this allows a third-party app to draw overlays over banking apps.
+- **`io.rong.push.notification.RongBridgeActivity`** — exported, standard RongCloud bridge activity.
+- **`com.google.firebase.iid.FirebaseInstanceIdReceiver`** — exported, protected by `com.google.android.c2dm.permission.SEND` (standard).
+
+### Insecure Configuration Flags
+
+- `android:allowBackup="true"` + **no `dataExtractionRules`** — all `SharedPreferences` (including plaintext password, AWS keys, API token) can be extracted via `adb backup`.
+- `android:usesCleartextTraffic="true"` — HTTP without encryption is allowed.
+- `android:requestLegacyExternalStorage="true"` + `MANAGE_EXTERNAL_STORAGE` — double bypass of Android 10+ scoped storage.
+- `android:largeHeap="true"` — requested large heap (typical for media processing or hidden heavy activity).
+- `android:debuggable="false"` — good, but doesn't protect against backup extraction.
+- **`<queries>` block: not found** — the app does not declare package-visibility. It likely enumerates installed apps via `getInstalledPackages` (does not require `<queries>`) or via native code.
+
+### Backup & Extraction Rules
+
+| Attribute | Value |
+|---|---|
+| `allowBackup` | `true` |
+| `fullBackupContent` | not found |
+| `dataExtractionRules` | not found |
+| `networkSecurityConfig` | not found |
 
 ## Hidden Investment Module
 
