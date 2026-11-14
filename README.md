@@ -191,6 +191,9 @@ requests can be forged.
 
 The observed behavior maps to the following MITRE ATT&CK techniques:
 
+```markdown
+- **T1626:** Abuse Elevation Control Mechanism (exported window-manager service)
+- **T1516:** Input Injection (potential via `PHONE_CONTROL_USER` + `SYSTEM_ALERT_WINDOW`)
 - **T1417:** Input Capture (fake investment forms capturing card data and CVV)
 - **T1409:** Stored Application Data (credentials and tokens stored in plaintext SharedPreferences)
 - **T1521:** Encrypted Channel (partially bypassed due to `usesCleartextTraffic="true"`)
@@ -213,6 +216,37 @@ Static analysis of the decompiled code revealed direct links to the operators an
 - **Email:** `Onlinedating999@proton.me`
 - **Image CDN:** `http://image.opppi.com/`
 ### Hardcoded Payment Gateway (Homoglyph Domain)
+### API Surface (Grouped by `mod`)
+
+All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap=2&client_id=1&abc=1`. Endpoints are grouped by `mod`:
+
+| `mod` | Key `act` values | Purpose |
+|---|---|---|
+| `Login` | `doLogin`, `unLogin`, `device` | Auth |
+| `Register` | `new_register`, `check_device`, `search_email` | Registration |
+| `User` | `userInfo`, `updateHeadimg`, `ad_set`, `autoDenounce` | Profile, ads, **auto-denounce** |
+| `Capital` | `getFinancialProducts`, `buyFinancialProduct`, `applyWithdraw`, `redeemInvestment` | **Investment module** |
+| `Resources` | `photo`, `video`, `user_vault`, `valut_list`, `delete_photo` | Private photo vault |
+| `Upload` | `get_sts_token`, `return_token`, `save_token`, `uploadImage` | S3 token exchange |
+| `Send` | `sendText`, `sendImg`, `sendVoice`, `room`, `phone_score`, `sendPhone` | Chat & **paid phone calls** |
+| `Receive` | `messageList`, `count`, `group_members` | Chat inbox |
+| `Gift` | `gift`, `buy`, `checkNum`, `send` | Virtual gifts |
+| `Follow` | `doFollow`, `unFollow`, `getfollow` | Social graph |
+| `Feed` | `getfeed`, `addcomment`, `delfeed` | Feed |
+| `Translate` | `language_to`, `special_language_to` | Translation |
+| `Push` | `register`, `unbind` | FCM/RongCloud push |
+| `WebMessage` | `pl`, `zan`, `atme` | Web notifications |
+
+### Remote Phone Control Endpoint
+
+`MyWindowmanagerServiceRong.smali:18` defines:
+
+```text
+PHONE_CONTROL_USER = "https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
+
+This endpoint is named phone_control_user (under mod=Receive). Combined with the exported MyWindowmanagerServiceRong service and SYSTEM_ALERT_WINDOW permission, this is a potential remote-control / overlay-injection vector. The exact act value is not visible in the snippet, but the naming is self-explanatory.
+
+
 
 Static analysis of `Base64Utils.smali` revealed a base64-encoded URL that decodes to:
 https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
@@ -299,6 +333,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 - Payment C2 domain: `0nlinepay[.]com` (homoglyph of "onlinepay"; hardcoded base64 in `Base64Utils.smali`)
 - Payment API path: `https://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
+- Hardcoded `api_token`: `B13B-6D71-4EF5-88FA-F32781734A7F` (used in upload/S3 requests)
 
 ### APK Signing Certificate (Developer Identity)
 
