@@ -196,7 +196,8 @@ The observed behavior maps to the following MITRE ATT&CK techniques:
 - **T1521:** Encrypted Channel (partially bypassed due to `usesCleartextTraffic="true"`)
 - **T1584:** Compromise Infrastructure (usage of Amazon CloudFront/Route53 to hide C2)
 - **T1428:** Exploitation for Client Execution (requesting `REQUEST_INSTALL_PACKAGES` for further payloads)
-
+- **T1417.001:** Input Capture — Keylogging (WebView with JS enabled in `VisaWebActivity`)
+- **T1539:** Steal Web Session Cookie (via WebView)
 
 
 
@@ -211,6 +212,24 @@ Static analysis of the decompiled code revealed direct links to the operators an
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
 - **Email:** `Onlinedating999@proton.me`
 - **Image CDN:** `http://image.opppi.com/`
+### Hardcoded Payment Gateway (Homoglyph Domain)
+
+Static analysis of `Base64Utils.smali` revealed a base64-encoded URL that decodes to:
+https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
+
+- **Homoglyph trick:** `0nlinepay` uses digit `0` instead of letter `o` to impersonate "onlinepay".
+- **Purpose:** This is a separate payment-processing endpoint, distinct from `opppi[.]com`. Likely used for card-not-present transactions or a secondary cash-out channel.
+- **Sample order ID:** `2802101131145720` (can be used as a pivot for OSINT).
+
+### Weak Encryption & WebView Configuration
+
+- **DES encryption** is used in `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity` (`const-string v7, "des"`). DES is cryptographically broken (56-bit key) and unsuitable for protecting chat messages.
+- **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. Combined with the "Visa" naming, this suggests a phishing screen for card data — a classic WebView-based credential harvester.
+- **`AdvertWebActivity`** also enables JavaScript, loading URLs from intent extras (potential open redirect).
+
+### Anti-Analysis: Not Detected
+
+No root, emulator, Frida, Xposed, Magisk, QEMU, or `ptrace` checks were found in smali. This is unusual for banking trojans but consistent with **scamware** — the operators don't expect the victim to be a researcher, so they skip anti-analysis.
 
 ### Certificate Transparency & Subdomain Discovery
 Analysis of Certificate Transparency logs (crt.sh) revealed the following subdomains and historical context:
@@ -278,6 +297,8 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - IM provider: RongCloud (`io.rong.*`)
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
+- Payment C2 domain: `0nlinepay[.]com` (homoglyph of "onlinepay"; hardcoded base64 in `Base64Utils.smali`)
+- Payment API path: `https://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
 
 ### APK Signing Certificate (Developer Identity)
 
