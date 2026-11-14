@@ -20,12 +20,24 @@
 
 ## Table of Contents
 
-- [Scope & Limitations](#scope--limitations) · [What This Write-up Demonstrates](#what-this-write-up-demonstrates) · [TL;DR / Key Findings](#tldr--key-findings)
-- [Executive Summary](#executive-summary) · [Sample Information](#sample-information) · [Campaign Timeline](#campaign-timeline)
-- [Manifest Analysis](#manifest-analysis) · [Hidden Investment Module](#hidden-investment-module) · [Data Collected and Stored Insecurely](#data-collected-and-stored-insecurely)
-- [Cloud Storage (AWS S3)](#cloud-storage-aws-s3) · [API Authentication Weakness](#api-authentication-weakness) · [MITRE ATT&CK Mapping](#mitre-attck-mapping)
-- [OSINT Findings](#osint-findings-extracted-artifacts) · [Indicators of Compromise (IOCs)](#indicators-of-compromise-iocs)
-- [Detection & Hunting](#detection--hunting) · [YARA Rule](#yara-rule) · [What Is NOT Published](#what-is-not-published) · [Recommendations](#recommendations)
+- [Scope & Limitations](#scope--limitations)
+- [What This Write-up Demonstrates](#what-this-write-up-demonstrates)
+- [TL;DR / Key Findings](#tldr--key-findings)
+- [Executive Summary](#executive-summary)
+- [Sample Information](#sample-information)
+- [Campaign Timeline](#campaign-timeline)
+- [Manifest Analysis](#manifest-analysis)
+- [Hidden Investment Module](#hidden-investment-module)
+- [Data Collected and Stored Insecurely](#data-collected-and-stored-insecurely)
+- [Cloud Storage (AWS S3)](#cloud-storage-aws-s3)
+- [API Authentication Weakness](#api-authentication-weakness)
+- [MITRE ATT&CK Mapping](#mitre-attck-mapping)
+- [OSINT Findings](#osint-findings-extracted-artifacts)
+- [Indicators of Compromise (IOCs)](#indicators-of-compromise-iocs)
+- [Detection & Hunting](#detection--hunting)
+- [YARA Rule](#yara-rule)
+- [What Is NOT Published](#what-is-not-published)
+- [Recommendations](#recommendations)
 
 ---
 
@@ -115,7 +127,7 @@ The application also collects **full payment card data** and stores the user's
 | Incident Date | October 19, 2026 (date of the scam attempt) |
 | **Infrastructure Status** | **Mitigated by AWS (Case #179395433200804)** |
 
-**Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `crt.sh`, `WHOIS`, `Wayback Machine`, `URLScan.io`, `VirusTotal`, `Tronscan`.
+**Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `apksigner` / `keytool` (signing-certificate review), `crt.sh`, `WHOIS`, `Wayback Machine`, `URLScan.io`, `VirusTotal`, `Tronscan`.
 
 **Case Status:** Reported to AWS Trust & Safety. AWS confirmed that the malicious infrastructure (CloudFront/Route 53) has been **mitigated** (Case #179395433200804).
 
