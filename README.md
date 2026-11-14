@@ -234,6 +234,32 @@ The application hardcodes several API keys used for its infrastructure. Values a
   *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
 - **AWS IP Check:** `https://checkip.amazonaws.com` *(Used to track victim's real IP)*
 
+### Resources & Assets Analysis
+
+Static review of `res/` and `assets/` revealed **no additional external endpoints or C2 domains** beyond `opppi[.]com` and `image.opppi[.]com`.
+
+Key artifacts:
+
+- **`assets/area.json`** — country/phone-code dictionary (Taiwan, US, Singapore, etc.). Used for registration country selection; not an IOC.
+- **`assets/kurento_room_base64.cer`** — X.509 certificate for **Kurento** media server, issued in **2015 and expired in 2016**. This is a public/demo certificate from Kurento (open-source WebRTC media server), not operator-specific. Indicates the app reuses old WebRTC boilerplate.
+- **`assets/gif/meme1.gif` … `meme56.gif`** — 56 generic GIF assets (UI stickers). No metadata or IOCs.
+- **`res/raw/`** — audio files (`phone_s.mp3`, `phonevoice.mp3`, `prompt1.wav`, `rongphonevoice.aac`) and `firebase_common_keep.xml`. Audio files are voice-call ringtones/prompts; no embedded URLs.
+- **No `.db`, `.sqlite`, `.jks`, `.keystore`, `.p12`, `.bks` files** were found in `res/` or `assets/`.
+
+### Administrative / Test Strings
+
+The resources contain admin/test UI strings, consistent with a reused dating-app template:
+
+- `ad_admin_ad` — “advisory admin-Add a custom ad”
+- `ad_admin_ad_ad` — “Custom ad serving”
+- `ad_admin_ad_ai` — “Customized advertising, please consult:”
+- `ball_system` — “Admin”
+- `register_send_error` — “Transmission error, please contact the administrator”
+- Test layout components: `com.FeiQQ.FeiQQ.utile.recordtest.RecordButton`, `com.FeiQQ.FeiQQ.utile.newtest.RefreshLayout`
+- Test view IDs: `@id/tv_test_copy`, `@id/iv_test_copy`
+
+**Note:** The absence of additional URLs in `assets/`/`res/` confirms that the C2 logic is implemented in code (`Constant.smali`, `AndroidHttpUtil`, etc.), not in resource files.
+
 ---
 
 ## Indicators of Compromise (IOCs)
