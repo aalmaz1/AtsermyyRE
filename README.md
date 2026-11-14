@@ -218,14 +218,14 @@ Static analysis of the decompiled code revealed direct links to the operators an
 - **Operator Contact (Skype):** `yuan.zi4` 
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
 - **Email:** `Onlinedating999@proton.me`
-- **Image CDN:** `http://image[.]opppi[.]com/`
+- **Image CDN:** `hxxp://image[.]opppi[.]com/`
 
 ### Hardcoded Payment Gateway (Homoglyph Domain)
 
 Static analysis of `Base64Utils.smali` revealed a base64-encoded URL that decodes to:
 
 ```text
-https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
+hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
 ```
 
 - **Homoglyph trick:** `0nlinepay` uses digit `0` instead of letter `o` to impersonate "onlinepay".
@@ -234,7 +234,7 @@ https://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
 
 ### API Surface (Grouped by `mod`)
 
-All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap=2&client_id=1&abc=1`. Endpoints are grouped by `mod`:
+All requests go to `hxxps://www[.]opppi[.]com/api.php` with fixed parameters `ap=2&client_id=1&abc=1`. Endpoints are grouped by `mod`:
 
 | `mod` | Key `act` values | Purpose |
 |---|---|---|
@@ -258,7 +258,7 @@ All requests go to `https://www[.]opppi[.]com/api.php` with fixed parameters `ap
 `MyWindowmanagerServiceRong.smali:18` defines:
 
 ```text
-PHONE_CONTROL_USER = "https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
+PHONE_CONTROL_USER = "hxxps://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
 ```
 
 This endpoint is named **`phone_control_user`** (under `mod=Receive`). Combined with the **exported** `MyWindowmanagerServiceRong` service and `SYSTEM_ALERT_WINDOW` permission, this is a potential **remote-control / overlay-injection vector**.
