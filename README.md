@@ -67,7 +67,7 @@ Key findings from `AndroidManifest.xml`:
   custom-ROM artifact. It does **not** add overlay capability beyond `SYSTEM_ALERT_WINDOW`.
 - `REQUEST_INSTALL_PACKAGES` — install additional APKs outside Google Play.
 - `RECEIVE_BOOT_COMPLETED` — auto-start after reboot.
-- `DISABLE_KEYGUARD` — dismiss the lock screen.
+- `DISABLE_KEYGUARD` — legacy permission associated with controlling keyguard behavior. Its presence does not prove that the application can bypass a secure device lock screen.
 - `READ_PHONE_STATE` — device identifiers.
 - `REAL_GET_TASKS` (signature|privileged) and `GET_TASKS` (deprecated since API 21) are
   **declared but not grantable to third-party apps on modern Android**. They may only matter
@@ -437,14 +437,24 @@ To ensure the accuracy of the extracted indicators, several external checks were
 - **Firebase Project (`ccatsov`):** Checked `ccatsov[.]firebaseio[.]com/.json`. Result: **404 Not Found** (indicates the Realtime Database is either disabled or does not exist; the project likely only uses FCM for push notifications).
 - **Skype ID (`yuan.zi4`):** Searched via Google and public databases. Result: **No public scam reports or correlations found at the time of check.**
 
-### Dropper / Self-Update Capability
+### Dropper / Secondary APK Delivery
 
-`WelcomeActivity` contains a downloader that fetches an additional APK from the C2 (`opppi[.]com`) and launches the Android package installer:
+`WelcomeActivity` contains code that downloads an additional APK and launches the Android package installer.
 
-- Downloads to `/sdcard/download/` via `HttpURLConnection`
-- Uses intent `application/vnd.android.package-archive` with `FLAG_ACTIVITY_NEW_TASK`
-- Requires `REQUEST_INSTALL_PACKAGES` (declared in manifest)
-- This provides a potential mechanism for delivering a secondary payload, subject to Android's unknown-source installation controls and user confirmation.This is consistent with a secondary APK delivery mechanism. The downloaded payload may be different from the original application, but its functionality has not been established. Installation remains subject to Android's unknown-source installation controls and user confirmation.
+Identified behavior:
+
+- Downloads an APK using `HttpURLConnection`.
+- Writes the downloaded file to `/sdcard/download/`.
+- Launches an installation intent with MIME type
+  `application/vnd.android.package-archive`.
+- Uses `FLAG_ACTIVITY_NEW_TASK`.
+- The manifest declares `REQUEST_INSTALL_PACKAGES`.
+
+This establishes a secondary APK delivery mechanism. The functionality of the downloaded payload has not been analyzed, so its purpose and behavior remain unknown.
+
+Installation is subject to Android's package installation controls, including the applicable unknown-source authorization requirements and user interaction.
+
+**Target SDK:** The application declares `targetSdkVersion=28` (Android 9). This affects compatibility behavior on newer Android versions, but the value alone does not establish an intentional attempt to bypass scoped storage or permission restrictions.
 
 **Additional indicator:** App targets `targetSdkVersion=28` (Android 9) deliberately to bypass modern scoped-storage and permission restrictions.
 
