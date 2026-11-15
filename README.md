@@ -477,21 +477,22 @@ The examined client code does not establish that the backend successfully deduct
 
 ### Call Timer and Periodic Backend Requests
 
-The inspected voice-call implementation maintains an integer counter named `timevoice`. Its synthetic accessor increments the counter by one and stores the updated value.
+The inspected `MyWindowmanagerServiceRong$3.run()` method implements a background loop with a nominal one-second delay.
 
-The service also maintains a string field named `goldinfo_num`. The examined timer-related code converts this value to an integer and uses a remainder operation (`rem-int/2addr`) with the `timevoice` counter.
+The method calls `Thread.sleep(1000)` and then invokes the service's synthetic counter accessor `access$1208()`. The counter is subsequently read and used in a remainder operation (`rem-int/2addr`) with an integer value parsed from a string.
 
-In the inspected `MyWindowmanagerServiceRong$3` code, the calculated remainder is compared with the string `"6"`. When the comparison succeeds, the code sends Handler message `0x4c6` through `changeImageHandler`.
+The inspected code compares the calculated remainder against the string `"6"`. When the comparison succeeds, it sends Handler message `0x4c6` through `changeImageHandler`.
 
-The audit also reports additional remainder comparisons involving values such as `400`, `500`, and `599`, associated with Handler messages `0x179`, `0x17a`, and `0x18f`. These additional mappings should be documented as confirmed only after their original Smali branches have been individually verified.
+The audit also reports additional remainder comparisons associated with Handler messages `0x179`, `0x17a`, and `0x18f`. Their exact remainder constants and corresponding branches should be confirmed against the original Smali instructions before being treated as established mappings.
 
-The examined Handler implementations contain call paths to billing-related methods, including `deductgold()` and `sendOrder_id()`. The floating-window service's `0x16e` branch invokes `deductgold()` when the user's `sex` value is not `"2"`. The `0x18f` branch contains service-state and user-sex checks before invoking `sendOrder_id()`.
+The service Handler contains several relevant branches:
 
-The provided `SendVoiceActivity$1` fragment also shows a call to `deductgold()` in the `0x14d` branch, without an explicit `sex` check in that branch.
+- `0x16e`: checks the user's `sex` value and invokes `deductgold()` when it is not equal to `"2"`.
+- `0x179` and `0x17a`: reported to invoke `checkgold()` with the respective message code; the complete call instructions should be retained as supporting evidence.
+- `0x18f`: follows a service-state and user-sex-dependent path that can invoke `sendOrder_id()`.
+- `0x4c6`: reported to trigger message-read-related processing; it should not be classified as a billing operation without further evidence.
 
-The audit did not identify `goldinfo_num` as a direct parameter in the examined `phone_score` or `sendPhone` HTTP requests.
-
-**Assessment:** The client contains a timer-driven mechanism that uses a call-related counter and a configurable numeric value to schedule Handler events. Some of these paths invoke backend-related billing methods. This is consistent with periodic call-session checks or billing-related scheduling, but the exact charging interval, tariff calculation, and server-side deduction behavior have not been independently established.
+**Assessment:** The examined service contains a background counter that advances after nominal one-second sleeps and drives modulo-based Handler scheduling. Some Handler paths invoke backend-related billing methods. This establishes client-side timer-driven request logic, but does not independently establish the server's charging rules or successful monetary deductions.
 
 ### `phone_score` and `sendPhone` Request Flow
 
