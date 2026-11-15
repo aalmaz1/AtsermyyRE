@@ -368,6 +368,8 @@ Analysis of `META-INF/CERT.RSA` reveals the signing certificate used to build th
 
 **Disclaimer:** Tiendanube is a legitimate e-commerce platform and is **not involved** in this campaign in any way. The certificate subject was **spoofed by the operators** to impersonate the company. This mention is provided solely to document the impersonation technique observed in the APK.
 
+> **Responsible Disclosure:** Tiendanube has been notified via `security.report@tiendanube.com` regarding the spoofed certificate.
+
 ### OSINT Verification Status
 
 To ensure the accuracy of the extracted indicators, several external checks were performed:
