@@ -13,8 +13,8 @@
 ## Executive Summary
 
 An Android application (`com.FeiQQ.FeiQQ`) was received outside of any official app store
-from a person met online, who then suggested installing it. The APK does not exist in
-Google Play and has no legitimate publisher. Static analysis shows it is a **dating-themed
+from a person met online, who then suggested installing it. The APK does not exist in Google Play, and no legitimate publisher was identified.
+Static analysis shows it is a **dating-themed
 application with a hidden investment module** — a classic **pig butchering / romance scam**
 pattern:
 
@@ -202,7 +202,7 @@ The following table maps the observed artifacts and malicious functionality of t
 | **Execution** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Auto-start on boot via `RECEIVE_BOOT_COMPLETED` and handling of system events (`USER_PRESENT`, `POWER_CONNECTED/DISCONNECTED`). |
 | **Persistence** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Persistence via Broadcast Receivers (`PushReceiver`, `FirebaseInstanceIdReceiver`). |
 | **Defense Evasion** | **[T1406](https://attack.mitre.org/techniques/T1406/)** | Obfuscated Files or Information | Base64-encoded payment URLs (`aHR0cHM6Ly8wbmxpbmVwYXku...` → `https://0nlinepay[.]com/...` in `Base64Utils.smali`). |
-| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | Phishing overlays and input capture over other apps via `SYSTEM_ALERT_WINDOW` and the `MyWindowmanagerServiceRong` service. |
+| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | **Potential phishing mechanism:** Use of `VisaWebActivity` (JS enabled, file access) and `SYSTEM_ALERT_WINDOW` to display fake forms and capture input over other apps. |
 | | **[T1409](https://attack.mitre.org/techniques/T1409/)** | Access Stored Application Data | Plaintext storage of session tokens, credentials, and configuration in `SharedPreferences("MyInformation")`. |
 | **Discovery** | **[T1426](https://attack.mitre.org/techniques/T1426/)** | System Information Discovery | Collection of device identifiers (`Build.MODEL`, `Build.VERSION.RELEASE`, `TelephonyManager`) in `WelcomeActivity.smali` and `NewTaskActivity.smali`. |
 | | **[T1420](https://attack.mitre.org/techniques/T1420/)** | File and Directory Discovery | Request for direct filesystem access via `MANAGE_EXTERNAL_STORAGE` and `READ/WRITE_EXTERNAL_STORAGE`. |
@@ -211,7 +211,7 @@ The following table maps the observed artifacts and malicious functionality of t
 | **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | Command and control and data exfiltration over HTTP/HTTPS to `https://www[.]opppi[.]com/api.php` via `AbHttpUtil`. |
 | | **[T1481](https://attack.mitre.org/techniques/T1481/)** | Web Service | Use of third-party infrastructure (RongCloud RTC/IM, Firebase Messaging) for push commands and message delivery. |
 | | **[T1521](https://attack.mitre.org/techniques/T1521/)** | Encrypted Channel | Use of weak DES encryption (`ChatActivity.smali`, `ChatRongActivity.smali`) to obfuscate message traffic. |
-| **Privilege Escalation** | **[T1626](https://attack.mitre.org/techniques/T1626/)** | Abuse Elevation Control Mechanism | Exported `MyWindowmanagerServiceRong` service combined with `SYSTEM_ALERT_WINDOW` and the C2 command `phone_control_user` as part of a privilege-abuse chain. |
+| **Privilege Escalation** | **[T1626](https://attack.mitre.org/techniques/T1626/)** | Abuse Elevation Control Mechanism | **Potential chain:** Exported `MyWindowmanagerServiceRong` service combined with `SYSTEM_ALERT_WINDOW` and the C2 command `phone_control_user`. (Requires further dynamic analysis to confirm actual privilege abuse). |
 
 ---
 
@@ -380,12 +380,12 @@ To ensure the accuracy of the extracted indicators, several external checks were
 
 ### Dropper / Self-Update Capability
 
-`WelcomeActivity` contains a downloader that fetches an APK from the C2 (`opppi[.]com`) and silently installs it:
+`WelcomeActivity` contains a downloader that fetches an additional APK from the C2 (`opppi[.]com`) and launches the Android package installer:
 
 - Downloads to `/sdcard/download/` via `HttpURLConnection`
 - Uses intent `application/vnd.android.package-archive` with `FLAG_ACTIVITY_NEW_TASK`
 - Requires `REQUEST_INSTALL_PACKAGES` (declared in manifest)
-- This is a classic **Dropper** pattern — the app can push new malware (banking trojan, ransomware) post-install, bypassing Google Play review.
+- This provides a potential mechanism for delivering a secondary payload, subject to Android's unknown-source installation controls and user confirmation. This is a classic **Dropper** pattern — the app can attempt to push new malware (banking trojan, ransomware) post-install, bypassing Google Play review.
 
 **Additional indicator:** App targets `targetSdkVersion=28` (Android 9) deliberately to bypass modern scoped-storage and permission restrictions.
 
