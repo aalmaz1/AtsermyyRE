@@ -25,7 +25,7 @@ The following functionality was identified:
 4. Collection and storage of certain account and contact information, including plaintext credentials and authentication-related values in application preferences.
 5. A secondary APK download and installation mechanism, subject to Android installation controls.
 
-**Payment card analysis:** Static analysis confirmed that the application reads payment card numbers (PAN) and CVV directly from payment form fields, stores these values in SharedPreferences under generic names, and submits them through an HTTP POST request to the application's payment API endpoint at `www[.]opppi[.]com`. The PAN is submitted as the `name` parameter, and the CVV as the `phone` parameter. The postal code is also stored and submitted under generic names. The examined handler reads the expiration month and year but does not include them in the identified storage or request-parameter flows.
+**Payment card analysis:** Static analysis identified two hidden payment-form fields that appear intended for card number (PAN) and security code (CVV/CVC). The payment click handler reads these fields and invokes Base64 encoding, but the encoded return values are not captured. No code path populating these fields, persisting their values, or adding them to the examined payment request was identified. The payment request instead includes the cardholder name, phone number, and email address under the parameters `name`, `phone`, and `email`, respectively. The available evidence does not establish that PAN or CVV values are collected or transmitted through these fields.
 
 The application communicates with backend infrastructure associated with `opppi[.]com` and uses third-party services, including RongCloud and AWS infrastructure.
 
@@ -154,66 +154,77 @@ The only_usdt field in PMyInformation suggests that the application supports or 
 
 ![Payment data fields](images/pminformation_credit.png)
 
-### Payment Card Data Collection, Local Storage and Restoration
+### Payment Form Fields and Payment API Request
 
-Static analysis of `PayNew_Activity$myOnClick.smali` and `PayNew_Activity.smali` confirms that the application collects payment form data, stores it in Android SharedPreferences, and restores previously stored values when the payment Activity is initialized.
+Static analysis of `PayNew_Activity.smali`, `PayNew_Activity$myOnClick.smali`, and the payment form layout identified several payment-related fields. The field names and UI hints alone are not sufficient to establish that all of them contain card data.
 
-**Identified data flows:**
+**1. Identified payment form fields**
 
-| Data | UI field | SharedPreferences file | Preference key | HTTP parameter |
-|---|---|---|---|---|
-| Card number (PAN) | `et_name_72` | `sp_name_win_ed` | `sp_name_win_ed` | `name` |
-| Card security code (CVV/CVC) | `et_name_162` | `sp_phone_win_ed` | `sp_phone_win_ed` | `phone` |
-| Postal code | `et_name_182` | `sp_email_win_ed` | `sp_email_win_ed` | `email` |
-
-**1. Local storage**
-
-The payment submission handler reads the values from the corresponding `EditText` fields using `getText().toString()`.
-
-Each value is stored in a separate SharedPreferences file using `SharedPreferences.Editor.putString()`, followed by `commit()`.
-
-**2. Restoration of previously stored values**
-
-The `PayNew_Activity.onCreate()` method retrieves the stored values using `SharedPreferences.getString()`.
-
-The following restoration chains were identified:
-
-- `sp_name_win_ed` → `sp_name` → `et_name_72.setText()` (PAN).
-- `sp_phone_win_ed` → `sp_phone` → `et_name_162.setText()` (CVV/CVC).
-- `sp_email_win_ed` → `sp_email` → `et_name_182.setText()` (postal code).
-
-Before populating each field, the application checks the retrieved value using `TextUtils.isEmpty()`.
-
-This confirms that previously stored payment information is automatically restored to the corresponding form fields when the Activity is initialized, provided that the stored values are non-empty.
-
-**3. Network transmission**
-
-The submission handler inserts the collected values into an `AbRequestParams` object using the following parameter names:
-
-| HTTP parameter | Actual content |
+| UI field | Observed purpose / characteristics |
 |---|---|
-| `name` | Card number (PAN) |
-| `phone` | Card security code (CVV/CVC) |
-| `email` | Postal code |
+| `et_name_72` | Visible EditText used as the cardholder name field |
+| `et_name_92` | Hidden integer-input EditText with hint `1`; likely intended for PAN |
+| `et_name_142` | Hidden integer-input EditText with hint `111` and maximum length 3; likely intended for CVV/CVC |
+| `et_name_122`, `et_name_123` | TextViews associated with expiry month/year selection |
+| `et_name_162` | Phone number |
+| `et_name_182` | Email address |
+| `et_name_222` | Postal code field in a hidden form section |
 
-The request parameters are passed through the following call chain:
+The PAN-like and CVV-like fields are declared in `PayNew_Activity` and initialized using `findViewById()`. Their parent containers are marked `visibility="gone"` in the examined layout.
+
+**2. PAN/CVV field handling**
+
+The payment click handler reads `et_name_92` and `et_name_142` using `getText().toString()`, converts the strings to byte arrays, and invokes `Base64.encodeToString()`.
+
+However, the return values of these Base64 calls are not captured by the caller. No subsequent use of the encoded values was identified in the examined handler.
+
+The examined code did not reveal a population path for these two fields, nor did the reviewed request-construction or persistence paths show their values being stored or submitted.
+
+The XML hints (`1` and `111`) are placeholders, not initial field values. The available static evidence therefore does not establish that PAN or CVV/CVC values are actually collected or transmitted through these fields.
+
+**3. Payment API request construction**
+
+The payment handler constructs an `AbRequestParams` object and adds the following parameters:
+
+| HTTP parameter | Source | Observed meaning |
+|---|---|---|
+| `email` | `et_name_182` | Email address |
+| `phone` | `et_name_162` | Phone number |
+| `name` | `et_name_72` | Cardholder name |
+| `uid` | `PMyInformation.getUid()` | User identifier |
+| `ip` | `PayNew_Activity.line_ip` | Value obtained from an external IP-check service |
+| `from` | Constant `"2"` | Application-defined parameter |
+| `type` | Constant `"3"` | Application-defined parameter |
+| `charge_value` | `PayNew_Activity.gold_num` | Payment/top-up amount |
+| `deviceName` | `android.os.Build.MODEL` | Android device model |
+| `client` | `PMyInformation.getUid()` | Same getter/source as `uid` |
+| `api_token` | Computed in `setWeb()` | Request authentication-related parameter |
+
+The request is passed through this call chain:
 
 `PayNew_Activity$myOnClick.onClick()` → `access$1800()` → `setWeb()` → `AbHttpUtil.post()`.
 
-The identified endpoint is:
+The endpoint is:
 
 `https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&mod=Pay&act=pay&api_version=pay`
 
+This establishes that the application prepares these parameters and passes them to its HTTP client's POST method. Static analysis alone does not prove successful network transmission, server receipt, processing, or retention.
+
+**4. Public IP lookup**
+
+`PayNew_Activity.onCreate()` starts a background thread that requests `https://checkip.amazonaws.com`. The response is read and assigned to `PayNew_Activity.line_ip`, which is later added to the payment request as the `ip` parameter.
+
+Because the lookup runs asynchronously and the examined handler does not validate `line_ip` before adding it to the request, an early payment-button tap could result in a null or empty value. This is a possible timing condition, not a confirmed runtime outcome.
+
+The value represents the public egress IP observed by the external service, which may differ from a device's local IP and can be affected by NAT, VPNs, or proxies.
+
 **Assessment**
 
-The examined code establishes the following behaviors:
+The examined payment flow confirms submission of a cardholder name, phone number, email address, user identifier, IP-check result, device model, payment amount, and additional application-defined parameters to the payment API.
 
-- Collection of PAN and CVV/CVC from payment form fields.
-- Local persistence of payment data in separate SharedPreferences files.
-- Automatic restoration of previously stored values into the payment form.
-- Preparation of PAN, CVV/CVC and postal code as HTTP POST request parameters.
+It also confirms that the handler reads two hidden fields apparently intended for PAN and CVV/CVC and invokes Base64 encoding on their contents. However, the encoded results are not captured, and no corresponding PAN/CVV persistence or request-parameter flow was identified in the examined code.
 
-The code establishes client-side request submission, but does not independently prove successful server-side receipt, processing, or retention of the submitted information.
+Accordingly, the available evidence does not establish that this payment handler successfully collects, stores, or transmits PAN or CVV/CVC values.
 
 ### PMyInformation Data Model
 
@@ -259,17 +270,23 @@ The `toString()` implementation includes payment-related fields and other sensit
 
 ## API Authentication Weakness
 
-The client computes the request token as:
+The client computes the `api_token` request parameter using MD5.
+
+For the examined payment endpoint:
+
+`https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&mod=Pay&act=pay&api_version=pay`
+
+the inspected Smali code extracts the values `Pay` and `pay` from the URL, concatenates them without a separator, appends the locally stored `api_token_str`, and calculates the MD5 digest:
 
 ```text
-api_token = MD5( mod + act + api_version + api_token_str )
+api_token = MD5("Paypay" + api_token_str)
 ```
 
-The formula uses MD5 over a concatenation of request parameters and client-side token material.
+The value `api_token_str` is retrieved from the application's `PMyInformation` data model.
 
-The application stores api_token_str in its local preferences. If this value is recoverable from the APK or application data, a third party may be able to reproduce the client-side signature.
+This is an MD5-based client-side calculation, not HMAC-MD5 or encryption. The application contains the logic and token material needed to calculate this request parameter locally.
 
-Whether modified or forged requests are accepted depends on server-side validation. Server-side authentication logic has not been independently examined.
+Whether modified or forged requests are accepted depends on server-side validation. The server-side authentication implementation has not been independently examined.
 
 ## 🎯 MITRE ATT&CK for Mobile — Preliminary Mapping
 
@@ -278,7 +295,7 @@ The following is a preliminary mapping of observed application behavior to MITRE
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
 | **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The APK was delivered directly through a messenger rather than an official app store. |
-| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | PAN and CVV are read directly from payment form EditText fields and inserted into an HTTP POST request. See `PayNew_Activity$myOnClick.smali`. |
+| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | The payment handler reads two hidden EditText fields apparently intended for PAN and CVV/CVC and invokes Base64 encoding. The encoded return values are not captured, and no transmission of these values was identified in the examined request path. This evidence is insufficient to establish successful credential capture.|
 | **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | The application communicates with its backend API over HTTP/HTTPS. This establishes application-layer network communication, but does not by itself establish that every API operation is C2. |
 
 ---
@@ -396,7 +413,8 @@ The application hardcodes several API keys used for its infrastructure. Values a
 - **AWS Access Key:** `AKIA...` *(Used for S3 bucket `hk-attach`)*
 - **Firebase Project:** `ccatsov` 
   *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
-- **AWS IP Check:** `hxxps://checkip[.]amazonaws[.]com` *(Used to track victim's real IP)*
+- - **AWS IP Check:** `hxxps://checkip[.]amazonaws[.]com`
+  *(Used to obtain the public egress IP address observed by the external service; the returned value is added to the payment API request.)*
 
 ### Resources & Assets Analysis
 
@@ -443,7 +461,9 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
 - External payment gateway domain: 0nlinepay[.]com (digit 0 instead of letter o; URL recovered from Base64Utils.smali). Its exact operational role has not been independently established.
-- Payment API path: `hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
+- External payment gateway URL:
+  `hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
+  *(URL recovered from Base64Utils.smali; its operational role and relationship to the op ppi.com payment API have not been established.)*
 - Hardcoded `api_token`: `B13B-(redacted; full value available on request for verified researchers)A7F` (used in upload/S3 requests)
 
 ### APK Signing Certificate (Developer Identity)
