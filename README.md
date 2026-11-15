@@ -60,16 +60,16 @@ The application communicates with backend infrastructure associated with `opppi[
 
 Key findings from `AndroidManifest.xml`:
 
-- `MANAGE_EXTERNAL_STORAGE` — access to **all** files on the device, not just user-selected ones.
+- `MANAGE_EXTERNAL_STORAGE` — requests broad access to shared storage. Declaring this permission does not establish that the user granted the required special access or that the application actually accessed all shared files.
 - `SYSTEM_ALERT_WINDOW` — real Android permission; allows drawing overlays over other apps
   (clickjacking / phishing risk).
 - `SYSTEM_OVERLAY_WINDOW` — **non-standard / non-existent permission name**; declared in the
   manifest but ignored by Android and grants no rights. Likely a developer typo or a legacy
   custom-ROM artifact. It does **not** add overlay capability beyond `SYSTEM_ALERT_WINDOW`.
 - `REQUEST_INSTALL_PACKAGES` — install additional APKs outside Google Play.
-- `RECEIVE_BOOT_COMPLETED` — auto-start after reboot.
+- `RECEIVE_BOOT_COMPLETED` — allows the application to receive the boot-completed broadcast. Automatic startup depends on the presence and implementation of a corresponding receiver.
 - `DISABLE_KEYGUARD` — legacy permission associated with controlling keyguard behavior. Its presence does not prove that the application can bypass a secure device lock screen.
-- `READ_PHONE_STATE` — device identifiers.
+- `READ_PHONE_STATE` — requests access to certain phone-state information. The exact data available depends on the Android version, granted permissions, and application implementation.
 - `REAL_GET_TASKS` (signature|privileged) and `GET_TASKS` (deprecated since API 21) are
   **declared but not grantable to third-party apps on modern Android**. They may only matter
   on very old devices / legacy APIs. Their presence is suspicious, but it does not by itself
@@ -119,7 +119,9 @@ No `fullBackupContent`, `dataExtractionRules`, or `networkSecurityConfig` declar
 ![Investment activities in manifest](images/manifest_investment_activities.png)
 *Activities implementing the investment flow.*
 
-The manifest contains a complete investment lifecycle that has nothing to do with dating:
+The manifest and associated application code identify a dedicated
+investment-related module separate from the dating and communication
+features.
 
 - `ChuanTouAct` — investment (创投)
 - `ChuanTouBuyAct`, `ChuanTouBuyQueRenAct` — purchase and confirmation
@@ -271,13 +273,15 @@ The `toString()` implementation includes payment-related fields and other sensit
 - The app obtains **temporary AWS credentials** from its own server
   (`mod=Upload&act=get_sts_token`).
 - Uploads/downloads go to the S3 bucket `hk-attach`, region `ap-east-1`.
-- Private photos are stored under the prefix `privatealbum`.
-- "Private" user photos are therefore physically stored in the operator's S3 bucket,
-  not on the device.
+- The examined application configuration and upload-related code
+  indicate that user photos can be uploaded to an S3 bucket named
+  `hk-attach` in the `ap-east-1` region, under the `privatealbum` prefix.
+- This does not establish that these files exist exclusively in S3
+  or that local copies are never retained on the device.
 
 ---
 
-## API Authentication Weakness
+## Client-Side API Token Generation (MD5)
 
 The client computes the `api_token` request parameter using MD5.
 
@@ -304,14 +308,14 @@ The following is a preliminary mapping of observed application behavior to MITRE
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
 | **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The APK was delivered directly through a messenger rather than an official app store. |
-| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | The payment handler reads two hidden EditText fields apparently intended for PAN and CVV/CVC and invokes Base64 encoding. The encoded return values are not captured, and no transmission of these values was identified in the examined request path. This evidence is insufficient to establish successful credential capture.|
-| **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | The application communicates with its backend API over HTTP/HTTPS. This establishes application-layer network communication, but does not by itself establish that every API operation is C2. |
 
 ---
 
 ## OSINT Findings (Extracted Artifacts)
 
-Static analysis of the decompiled code revealed direct links to the operators and their financial infrastructure:
+Static analysis of the decompiled code revealed hardcoded contact
+details, a USDT-related wallet address, and infrastructure indicators
+associated with the application:
 
 - **Crypto Wallet (USDT TRC-20):** `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
   *(Hardcoded in `Usd_Activity` as a USDT-related wallet address. Its exact role in completed transactions has not been independently established.)*
@@ -333,7 +337,13 @@ Static analysis of `Base64Utils.smali` revealed a Base64-encoded URL:
 
 ### API Surface (Grouped by `mod`)
 
-All requests go to `hxxps://www[.]opppi[.]com/api.php` with fixed parameters `ap=2&client_id=1&abc=1`. Endpoints are grouped by `mod`:
+The application-specific API endpoints identified in the examined
+`Constant.smali` configuration use the following base URL:
+
+`hxxps://www[.]opppi[.]com/api.php`
+
+The application also references third-party infrastructure and
+services, including AWS and RongCloud.
 
 | `mod` | Key `act` values | Purpose |
 |---|---|---|
@@ -369,7 +379,10 @@ These artifacts justify further investigation of possible remote UI-control func
 ### Weak Encryption & WebView Configuration
 
 - **DES encryption** is used in `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity` (`const-string v7, "des"`). DES is cryptographically broken (56-bit key) and unsuitable for protecting chat messages.
-- - **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. This configuration creates a WebView security concern, but the class name and configuration alone do not establish phishing behavior or card-data harvesting. The confirmed PAN/CVV collection flow is documented in the payment handler section above.
+- **VisaWebActivity** enables `setJavaScriptEnabled(true)` and
+  `setAllowFileAccess(true)` on its WebView. This configuration creates
+  a WebView security concern, but the class name and configuration
+  alone do not establish phishing behavior or card-data harvesting.
 - **`AdvertWebActivity`** also enables JavaScript, loading URLs from intent extras (potential open redirect).
 
 ### Anti-Analysis: Not Detected
@@ -427,7 +440,9 @@ The application hardcodes several API keys used for its infrastructure. Values a
 
 ### Resources & Assets Analysis
 
-Static review of `res/` and `assets/` revealed **no additional external endpoints or C2 domains** beyond `opppi[.]com` and `image[.]opppi[.]com`.
+No additional external endpoint strings were identified in the
+examined `res/` and `assets/` directories beyond the domains listed
+in this report.
 
 Key artifacts:
 
@@ -449,7 +464,10 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - Test layout components: `com.FeiQQ.FeiQQ.utile.recordtest.RecordButton`, `com.FeiQQ.FeiQQ.utile.newtest.RefreshLayout`
 - Test view IDs: `@id/tv_test_copy`, `@id/iv_test_copy`
 
-**Note:** The absence of additional URLs in `assets/`/`res/` confirms that the C2 logic is implemented in code (`Constant.smali`, `AndroidHttpUtil`, etc.), not in resource files.
+**Note:** The absence of additional endpoint strings in the examined resources
+suggests that the identified application API configuration is
+implemented primarily in application code rather than in these
+resource files.
 
 ---
 
@@ -500,8 +518,11 @@ The certificate validity begins on September 15, 2026, approximately one month b
 
 To ensure the accuracy of the extracted indicators, several external checks were performed:
 
-- **APK Certificate SHA-256:** Queried on VirusTotal. Result: **No matches found** (indicates a unique keystore, likely generated specifically for this campaign or not yet indexed by AV engines).
-- **Firebase Project (`ccatsov`):** Checked `ccatsov[.]firebaseio[.]com/.json`. Result: **404 Not Found** (indicates the Realtime Database is either disabled or does not exist; the project likely only uses FCM for push notifications).
+- **APK Certificate SHA-256:** Queried on VirusTotal. Result: **No matches found** No matches were returned for the certificate SHA-256 in the
+VirusTotal query performed at the time of checking. This does not
+establish when or for whom the certificate was created..
+- **Firebase Project (`ccatsov`):** Checked `ccatsov[.]firebaseio[.]com/.json`. Result: The request to ccatsov[.]firebaseio[.]com/.json returned HTTP 404.
+This does not establish whether Realtime Database is disabled,whether another database configuration exists, or which Firebase services are used by the application.
 - **Skype ID (`yuan.zi4`):** Searched via Google and public databases. Result: **No public scam reports or correlations found at the time of check.**
 
 ### Dropper / Secondary APK Delivery
