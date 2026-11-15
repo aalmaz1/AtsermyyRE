@@ -437,29 +437,41 @@ The inspected response listener (`MyWindowmanagerServiceRong$2`) parses successf
 
 The `order_id` value is assigned to the service's `order_id` field. Although `gold` is retrieved through `getGold()`, its return value is not captured or used in the inspected callback.
 
-### `order_id` Lifecycle and Additional `deductgold()` Call Sites
+### `phone_score` and `sendPhone` Request Flow
 
-The successful `phone_score` response (`code == "700"`) contains a `PhoneOrderinfo` object. The inspected response listener retrieves `order_id` using `PhoneOrderinfo.getOrder_id()` and stores the returned value in the service's `order_id` field through the synthetic accessor `access$502()`.
+The floating-window service implements a `deductgold()` method that submits a POST request to the backend endpoint:
 
-The service method `sendOrder_id()` subsequently reads this field and adds it to an HTTP request parameter named `order_id`.
+`/api.php?ap=2&client_id=1&abc=1&mod=Send&act=phone_score&api_version=message`
 
-This confirms that the client retains the order identifier returned by the `phone_score` response and transmits it in a subsequent backend request. The exact server-side purpose of that follow-up request has not been independently established.
+The request includes user identifiers, recipient information, device information, an IP value, and a client-side MD5-derived `api_token`.
 
-The audit also identifies additional calls to `deductgold()` in:
+When the response contains `code == "700"`, the inspected response handler parses a `PhoneOrderinfo` object, retrieves `order_id`, and assigns it to the service's `order_id` field. The handler also invokes `getGold()`, but the returned value is not captured in the examined callback.
 
-- `MyWindowmanagerServiceRong$1.smali`, in the handler for message `0x16e`, subject to the previously described `sex` condition.
-- `SendVoiceActivity$1.smali`.
-- `SendVoiceRongActivity$1.smali`.
+The service subsequently implements `sendOrder_id()`. Before sending a request, this method checks that both `to_uid` and `order_id` are non-empty.
 
-These reported call sites indicate that the method is not exclusive to the floating-window service. The exact triggering conditions in the two voice-related classes should be interpreted in the context of their complete containing methods.
+It then submits an HTTP POST request to:
 
-**Assessment:** The inspected client code establishes a billing- or score-related request flow involving `phone_score`, server-provided order information, and subsequent transmission of `order_id`. It does not independently establish the backend's actual currency-deduction behavior or prove that the order identifier records call duration or final call cost.
+`/api.php?ap=2&client_id=1&abc=1&mod=Send&act=sendPhone&api_version=message`
 
-No local balance update, UI update, or persistence of these response values was identified in the examined callback. The `onFailure()` implementation is empty.
+The request includes:
 
-**Assessment:** The client-side code confirms a billing- or score-related backend request and the extraction of order information. It does not establish that currency is actually deducted by the backend, nor does it demonstrate a local balance update. Server-side billing behavior has not been independently verified.
+- `order_id` — the value previously obtained from the `phone_score` response
+- `to_uid` — the recipient UID
+- `from_uid` — the current user's UID
+- `client` — the current user's UID
+- `ip` — the service's `line_ip` field
+- `deviceName` — `android.os.Build.MODEL`
+- `api_token` — an MD5-derived client-side value
 
-The `deductgold()` method is reportedly invoked both from the floating-window service and from voice-call Activity code. Therefore, this functionality is not exclusive to the floating window.
+The request is submitted through `AbHttpUtil.post()`.
+
+The inspected code therefore establishes a client-side sequence in which an order identifier returned by `phone_score` is retained and subsequently included in a separate `sendPhone` request.
+
+The audit also identified calls to `deductgold()` in the floating-window message handler (`MyWindowmanagerServiceRong$1`, message `0x16e`) and in `SendVoiceActivity$1` (message `0x14d`). The floating-window handler has a `sex`-based condition; the provided `SendVoiceActivity` excerpt shows a direct call in the `0x14d` branch without that condition.
+
+**Assessment:** The client implements a backend interaction flow involving score-related requests, server-provided order identifiers, and a subsequent `sendPhone` request. This is consistent with billing-related or call-session-related functionality. The exact server-side meaning of `sendPhone`, actual currency deduction, and any recording of call duration or final cost have not been independently established.
+
+
 
 ### Weak Encryption & WebView Configuration
 
