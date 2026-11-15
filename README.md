@@ -509,6 +509,18 @@ The audit also identified calls to `deductgold()` in the floating-window message
 
 **Assessment:** The client implements a backend interaction flow involving score-related requests, server-provided order identifiers, and a subsequent `sendPhone` request. This is consistent with billing-related or call-session-related functionality. The exact server-side meaning of `sendPhone`, actual currency deduction, and any recording of call duration or final cost have not been independently established.
 
+### Call Timer and Billing-Related Scheduling
+
+The examined voice-call code contains an integer field named `timevoice`. Its synthetic accessor `access$808()` reads the current value, increments the field by one, stores the incremented value, and returns the previous value.
+
+The service and voice-call Activity code also contain a string field named `goldinfo_num`, which is assigned from an Intent value.
+
+The audit report indicates that `timevoice` and `goldinfo_num` participate in local timer-related logic involving modulo operations and Handler messages. The exact scheduling conditions and all corresponding branches should be verified against the original Smali instructions before assigning a definitive billing interpretation.
+
+The inspected `SendVoiceActivity$1.handleMessage()` branch for message `0x14d` invokes `SendVoiceActivity.deductgold()`. The provided branch does not itself show a `sex` check. A separate `sex`-based condition was identified in the floating-window service handler.
+
+**Assessment:** The client contains an incrementing call-related counter and timer-driven paths that invoke billing-related methods. This is consistent with periodic call-session checks. The inspected code does not establish the backend's actual charging rules, the monetary value of a timer interval, or a locally calculated balance deduction.
+
 
 
 ### Weak Encryption & WebView Configuration
