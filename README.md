@@ -437,6 +437,24 @@ The inspected response listener (`MyWindowmanagerServiceRong$2`) parses successf
 
 The `order_id` value is assigned to the service's `order_id` field. Although `gold` is retrieved through `getGold()`, its return value is not captured or used in the inspected callback.
 
+### `order_id` Lifecycle and Additional `deductgold()` Call Sites
+
+The successful `phone_score` response (`code == "700"`) contains a `PhoneOrderinfo` object. The inspected response listener retrieves `order_id` using `PhoneOrderinfo.getOrder_id()` and stores the returned value in the service's `order_id` field through the synthetic accessor `access$502()`.
+
+The service method `sendOrder_id()` subsequently reads this field and adds it to an HTTP request parameter named `order_id`.
+
+This confirms that the client retains the order identifier returned by the `phone_score` response and transmits it in a subsequent backend request. The exact server-side purpose of that follow-up request has not been independently established.
+
+The audit also identifies additional calls to `deductgold()` in:
+
+- `MyWindowmanagerServiceRong$1.smali`, in the handler for message `0x16e`, subject to the previously described `sex` condition.
+- `SendVoiceActivity$1.smali`.
+- `SendVoiceRongActivity$1.smali`.
+
+These reported call sites indicate that the method is not exclusive to the floating-window service. The exact triggering conditions in the two voice-related classes should be interpreted in the context of their complete containing methods.
+
+**Assessment:** The inspected client code establishes a billing- or score-related request flow involving `phone_score`, server-provided order information, and subsequent transmission of `order_id`. It does not independently establish the backend's actual currency-deduction behavior or prove that the order identifier records call duration or final call cost.
+
 No local balance update, UI update, or persistence of these response values was identified in the examined callback. The `onFailure()` implementation is empty.
 
 **Assessment:** The client-side code confirms a billing- or score-related backend request and the extraction of order information. It does not establish that currency is actually deducted by the backend, nor does it demonstrate a local balance update. Server-side billing behavior has not been independently verified.
