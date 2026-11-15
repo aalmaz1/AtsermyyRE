@@ -412,30 +412,68 @@ The examined `0x16e` branch does not show modifications to floating-window Views
 
 **Assessment:** The examined endpoint response is associated with application account/service-status and billing logic. The inspected response-to-handler path does not demonstrate remote control of the floating window, remote screen automation, simulated touch input, or tapjacking. Other message-handler branches and unrelated service methods should be assessed separately before making broader claims about all floating-window behavior.
 
-### Phone Score API and Billing-Related Logic
+### `phone_score` → `order_id` → `sendPhone` Flow
 
-The service implements a method named `deductgold()` that conditionally submits an HTTP POST request to the backend endpoint:
+The application implements a client-side request sequence involving the backend endpoints `phone_score` and `sendPhone`.
+
+**1. `phone_score` request**
+
+The `MyWindowmanagerServiceRong.deductgold()` method conditionally submits an HTTP POST request to:
 
 `/api.php?ap=2&client_id=1&abc=1&mod=Send&act=phone_score&api_version=message`
 
-Before submitting the request, the method checks whether the current user UID matches the service's `goldinfo_uid` field.
+The method checks whether the current user's UID matches the service's `goldinfo_uid` field before submitting the request.
+
+The request includes `to_uid`, `check_score=2`, `from=2`, `a=w`, `ip`, `deviceName`, `client`, `from_uid`, and an MD5-derived `api_token`.
+
+**2. Server-provided order identifier**
+
+The inspected response handler (`MyWindowmanagerServiceRong$2`) parses successful responses and checks whether `code` equals `"700"`.
+
+For this response code, it extracts `order_id` and `gold` from a `PhoneOrderinfo` object. The `order_id` value is assigned to the service's `order_id` field. Although `getGold()` is invoked, its return value is not captured in the examined callback.
+
+**3. Subsequent `sendPhone` request**
+
+The service method `sendOrder_id()` checks that both `to_uid` and `order_id` are non-empty. If either value is empty, it returns without submitting a request.
+
+Otherwise, it sends an HTTP POST request to:
+
+`/api.php?ap=2&client_id=1&abc=1&mod=Send&act=sendPhone&api_version=message`
 
 The request includes:
-- `to_uid`
-- `check_score=2`
-- `from=2`
-- `a=w`
-- `ip`
-- `deviceName`
-- `client` (current user UID)
-- `from_uid` (current user UID)
-- `api_token` (client-side MD5-derived value)
 
-The request is submitted using `AbHttpUtil.post()`.
+- `order_id` — the identifier obtained from the `phone_score` response
+- `to_uid` — the recipient UID
+- `from_uid` — the current user's UID
+- `client` — the current user's UID
+- `ip` — the service's `line_ip` field
+- `deviceName` — `android.os.Build.MODEL`
+- `api_token` — an MD5-derived client-side value
 
-The inspected response listener (`MyWindowmanagerServiceRong$2`) parses successful responses using FastJSON and checks whether `code` equals `"700"`. For that response code, it extracts `order_id` and `gold` from a `PhoneOrderinfo` object.
+The request is submitted through `AbHttpUtil.post()`.
 
-The `order_id` value is assigned to the service's `order_id` field. Although `gold` is retrieved through `getGold()`, its return value is not captured or used in the inspected callback.
+**4. `sendPhone` call sites and response handling**
+
+The audit identified two call paths for `sendOrder_id()`:
+
+- `MyWindowmanagerServiceRong$1.handleMessage()`, in the branch handling message `0x18f`, subject to the inspected service-state and user-sex conditions.
+- `SendVoiceRongActivity.hangUp()`, where `sendOrder_id()` is invoked before the service is stopped.
+
+The response listener (`MyWindowmanagerServiceRong$5`) only prints the response body to standard output. Its inspected `onSuccess()` implementation does not parse response fields or update the service state or UI. Its `onFailure()`, `onStart()`, and `onFinish()` methods are empty.
+
+**5. Additional call-timing and billing-related fields**
+
+The service also contains the following fields and operations:
+
+- `goldinfo_num` is assigned from an `Intent` value.
+- `timevoice` is incremented by one in the inspected timer thread.
+- `check_score` is submitted as the constant string `"2"` in `deductgold()`.
+
+The examined `sendPhone` request does not include `timevoice` or `goldinfo_num` among its parameters.
+
+**Assessment:** Static analysis confirms a client-side sequence in which the application submits a `phone_score` request, receives and retains an `order_id`, and subsequently submits that identifier through a separate `sendPhone` request. The `sendPhone` call in `SendVoiceRongActivity.hangUp()` occurs before the service-stop operation. This is consistent with a call-session-related or billing-related backend workflow.
+
+The examined client code does not establish that the backend successfully deducts currency, finalizes an order, or calculates the cost using call duration. The server-side implementation and the exact meaning of the `phone_score` and `sendPhone` operations have not been independently verified.
 
 ### `phone_score` and `sendPhone` Request Flow
 
