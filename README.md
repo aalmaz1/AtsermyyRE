@@ -3,7 +3,9 @@
 
 > **DISCLAIMER:**
 > This repository contains the results of **static analysis** of a suspicious Android application
-> distributed via a romance scam. **The APK sample is NOT distributed here.** > No complete working secrets, full credential values, or personal data are published. Some infrastructure identifiers and token fragments are partially redacted.
+> distributed via a romance scam. **The APK sample is NOT distributed here.**
+> No complete working secrets, full credential values, or personal data are published.
+> Some infrastructure identifiers and token fragments are partially redacted.
 > This material is provided for **educational and defensive purposes only**.
 > If you received a similar APK — do not install it, do not run it, and report it.
 
@@ -246,6 +248,12 @@ The client computes the request token as:
 api_token = MD5( mod + act + api_version + api_token_str )
 ```
 
+The formula uses MD5 over a concatenation of request parameters and client-side token material.
+
+The application stores api_token_str in its local preferences. If this value is recoverable from the APK or application data, a third party may be able to reproduce the client-side signature.
+
+Whether modified or forged requests are accepted depends on server-side validation. Server-side authentication logic has not been independently examined.
+
 ## 🎯 MITRE ATT&CK for Mobile — Preliminary Mapping
 
 The following is a preliminary mapping of observed application behavior to MITRE ATT&CK for Mobile. Technique applicability depends on the demonstrated behavior, not merely on manifest permissions or the presence of related API calls.
@@ -253,7 +261,6 @@ The following is a preliminary mapping of observed application behavior to MITRE
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
 | **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The APK was delivered directly through a messenger rather than an official app store. |
-| **Execution** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Include only if the examined receiver implementation confirms execution in response to the relevant system broadcasts. |
 | **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | PAN and CVV are read directly from payment form EditText fields and inserted into an HTTP POST request. See `PayNew_Activity$myOnClick.smali`. |
 | **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | The application communicates with its backend API over HTTP/HTTPS. This establishes application-layer network communication, but does not by itself establish that every API operation is C2. |
 
@@ -263,25 +270,23 @@ The following is a preliminary mapping of observed application behavior to MITRE
 
 Static analysis of the decompiled code revealed direct links to the operators and their financial infrastructure:
 
-- **Crypto Wallet (USDT TRC-20):** `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro` 
-  *(Hardcoded in `Usd_Activity` for victim deposits. Trackable via Tronscan).*
-- **Blockchain Activity:** The wallet has 4,335 lifetime transactions but has been **inactive for the last 180 days**. Historical interactions show direct transfers from **OKX exchange** (KYC-trail), indicating a burner address strategy where operators rotate wallets dynamically.
+- **Crypto Wallet (USDT TRC-20):** `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
+  *(Hardcoded in `Usd_Activity` as a USDT-related wallet address. Its exact role in completed transactions has not been independently established.)*
+- **Blockchain Activity:** At the time of the blockchain check, the address showed 4,335 lifetime transactions and no activity during the preceding 180 days. Historical transactions included transfers associated with OKX-labeled addresses. These observations do not identify the wallet owner or establish a wallet-rotation strategy.
 - **Operator Contact (Skype):** `yuan.zi4` 
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
 - **Email:** `Onlinedating999[@]proton[.]me`
 - **Image CDN:** `hxxp://image[.]opppi[.]com/`
 
-### Hardcoded Payment Gateway (Homoglyph Domain)
+### Additional Hardcoded URL
 
-Static analysis of `Base64Utils.smali` revealed a base64-encoded URL that decodes to:
+Static analysis of `Base64Utils.smali` revealed a Base64-encoded URL:
 
-```text
-hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720
-```
+`hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx?order_id=2802101131145720`
 
-- **Homoglyph trick:** `0nlinepay` uses digit `0` instead of letter `o` to impersonate "onlinepay".
-- **Purpose:** This is a separate payment-processing endpoint, distinct from `opppi[.]com`. Likely used for card-not-present transactions or a secondary cash-out channel.
-- **Sample order ID:** `2802101131145720` (can be used as a pivot for OSINT).
+- **Visual substitution:** The domain uses digit `0` instead of the letter `o`.
+- **Purpose:** The URL is embedded in the application, but its exact operational role and relationship to the `opppi[.]com` payment API have not been independently established.
+- **Sample order ID:** `2802101131145720`. Its validity and association with an actual transaction have not been established.
 
 ### API Surface (Grouped by `mod`)
 
@@ -326,7 +331,9 @@ These artifacts justify further investigation of possible remote UI-control func
 
 ### Anti-Analysis: Not Detected
 
-No root, emulator, Frida, Xposed, Magisk, QEMU, or `ptrace` checks were found in smali. This is unusual for banking trojans but consistent with **scamware** — the operators don't expect the victim to be a researcher, so they skip anti-analysis.
+No root, emulator, Frida, Xposed, Magisk, QEMU, or `ptrace` checks were identified in the examined Smali code.
+
+This finding is limited to the code inspected. Native libraries, dynamically loaded code, and runtime behavior were not fully assessed. The absence of identified checks does not establish the operators' intent.
 
 ### Certificate Transparency & Subdomain Discovery
 
@@ -334,9 +341,27 @@ Analysis of Certificate Transparency logs (crt.sh) revealed the following subdom
 
 - **Discovered Subdomains:** `www[.]opppi[.]com`, `image[.]opppi[.]com`, **`test[.]opppi[.]com`** (new IOC).
 - **Timeline:** Certificates for `opppi[.]com` date back to **June 2022**, indicating long-term infrastructure usage.
-- **CA History:** The operators used multiple Certificate Authorities (TrustAsia in 2022, Amazon in 2023-2025, Sectigo in 2026), likely to evade blocklists.
+- **CA History:** The operators used multiple Certificate Authorities (TrustAsia in 2022, Amazon in 2023-2025, Sectigo in 2026).
 
-**Note on `test[.]opppi[.]com`:** A TLS certificate for this subdomain was issued on **2025-11-19** (Amazon RSA 2048 M01), but the DNS record **currently does not resolve** (confirmed via URLScan.io). This indicates the subdomain existed at some point (possibly a staging or admin panel) and was later removed — a common operational security practice to erase traces. The certificate, however, remains permanently in CT logs.
+**Note on `test[.]opppi[.]com`:**
+
+Certificate Transparency records on crt.sh show four TLS
+certificates containing this hostname, with issuance dates
+ranging from February 2023 to November 2025. The certificates
+were issued by Amazon RSA 2048 M01 and M03.
+
+A DNS check performed on **2026-11-15** using Google's
+public resolver (`8.8.8.8`) returned `NOERROR` with no
+answer records for A, AAAA, or CNAME queries.
+
+The DNS responses included the SOA record for `opppi.com`,
+identifying Cloudflare nameservers.
+
+These findings establish historical inclusion of the hostname
+in publicly logged TLS certificates and the absence of the
+queried DNS records at the time of testing. They do not establish
+what service the subdomain hosted, whether it was previously
+operational, or why it currently has no corresponding DNS records.
 
 ### AWS S3 Infrastructure — Historical Observation
 
@@ -413,9 +438,15 @@ Analysis of `META-INF/CERT.RSA` reveals the signing certificate used to build th
 - **SHA-256:** `AD:D0:0E:3B:31:AA:43:3B:B1:01:7D:7A:73:97:20:56:45:55:C9:7B:FB:C6:58:62:FB:D8:FE:D4:C9:68:5B:43`
 - **SHA-1:** `97:EA:B9:34:83:1A:1E:9A:58:DB:36:78:EC:6E:2A:3C:47:71:FE:86`
 
-**OSINT Note:** The operators spoofed **Tiendanube** — the largest e-commerce platform in Latin America (HQ in Buenos Aires). This explains why the app's Terms of Service mention *"Argentine law"* as the governing jurisdiction. The certificate was issued on **September 15, 2026** — one month before the scam attempt, indicating fresh infrastructure built specifically for this campaign.
+**Certificate Metadata Note:**
 
-**Disclaimer:** Tiendanube is a legitimate e-commerce platform and is **not involved** in this campaign in any way. The certificate subject was **spoofed by the operators** to impersonate the company. This mention is provided solely to document the impersonation technique observed in the APK.
+The signing certificate subject contains the organization fields `O=Tiendanube` and `OU=Tiendanube`, with `CN=otomasse`.
+
+These fields are self-asserted certificate metadata. They do not establish that Tiendanube issued, signed, or is affiliated with this APK.
+
+The certificate validity begins on September 15, 2026, approximately one month before the reported scam attempt. This timing is noteworthy but does not establish when the APK was built or whether the certificate was created specifically for this campaign.
+
+**Disclaimer:** Tiendanube is a legitimate e-commerce platform. No evidence of its involvement in this application or campaign has been identified.
 
 > **Responsible Disclosure:** Tiendanube has been notified via `security.report@tiendanube.com` regarding the spoofed certificate.
 
