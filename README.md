@@ -3,8 +3,7 @@
 
 > **DISCLAIMER:**
 > This repository contains the results of **static analysis** of a suspicious Android application
-> distributed via a romance scam. **The APK sample is NOT distributed here.** No malicious code,
-> no hardcoded credentials, and no personal data are published.
+> distributed via a romance scam. **The APK sample is NOT distributed here.** > No complete working secrets, full credential values, or personal data are published. Some infrastructure identifiers and token fragments are partially redacted.
 > This material is provided for **educational and defensive purposes only**.
 > If you received a similar APK — do not install it, do not run it, and report it.
 
@@ -313,12 +312,16 @@ All requests go to `hxxps://www[.]opppi[.]com/api.php` with fixed parameters `ap
 PHONE_CONTROL_USER = "hxxps://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
 ```
 
-This endpoint is named **`phone_control_user`** (under `mod=Receive`). Combined with the **exported** `MyWindowmanagerServiceRong` service and `SYSTEM_ALERT_WINDOW` permission, this is a potential **remote-control / overlay-injection vector**.
+The application defines a control-related endpoint named `phone_control_user` under `mod=Receive`.
+
+The APK also declares an exported `MyWindowmanagerServiceRong` service and requests `SYSTEM_ALERT_WINDOW`.
+
+These artifacts justify further investigation of possible remote UI-control functionality. However, the available evidence does not yet establish a complete server-command-to-overlay execution chain.
 
 ### Weak Encryption & WebView Configuration
 
 - **DES encryption** is used in `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity` (`const-string v7, "des"`). DES is cryptographically broken (56-bit key) and unsuitable for protecting chat messages.
-- **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. Combined with the "Visa" naming, this suggests a phishing screen for card data — a classic WebView-based credential harvester.
+- - **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. This configuration creates a WebView security concern, but the class name and configuration alone do not establish phishing behavior or card-data harvesting. The confirmed PAN/CVV collection flow is documented in the payment handler section above.
 - **`AdvertWebActivity`** also enables JavaScript, loading URLs from intent extras (potential open redirect).
 
 ### Anti-Analysis: Not Detected
@@ -335,12 +338,13 @@ Analysis of Certificate Transparency logs (crt.sh) revealed the following subdom
 
 **Note on `test[.]opppi[.]com`:** A TLS certificate for this subdomain was issued on **2025-11-19** (Amazon RSA 2048 M01), but the DNS record **currently does not resolve** (confirmed via URLScan.io). This indicates the subdomain existed at some point (possibly a staging or admin panel) and was later removed — a common operational security practice to erase traces. The certificate, however, remains permanently in CT logs.
 
-### AWS S3 Bucket Confirmation (via Wayback Machine)
+### AWS S3 Infrastructure — Historical Observation
 
-Historical snapshots of `image[.]opppi[.]com` on the Wayback Machine revealed an **AWS S3 `AccessDenied` XML error**. 
+Historical snapshots of `image[.]opppi[.]com` on the Wayback Machine contain an AWS S3-style `AccessDenied` XML response.
 
-- This confirms that `image[.]opppi[.]com` is a **custom domain mapped to an AWS S3 bucket**.
-- The "AccessDenied" response means the bucket exists but public listing is blocked, corroborating the static analysis finding that user photos are stored in the `hk-attach` S3 bucket.
+This response is consistent with an S3-backed endpoint, but it does not independently identify the bucket or prove that the custom domain maps to the `hk-attach` bucket.
+
+The attribution of the bucket name, region, and storage prefix should therefore be based on the application's extracted configuration and code, rather than on the historical error response alone.
 
 ### Cloud & Infrastructure Keys (Redacted)
 
@@ -442,8 +446,6 @@ Installation is subject to Android's package installation controls, including th
 
 **Target SDK:** The application declares `targetSdkVersion=28` (Android 9). This affects compatibility behavior on newer Android versions, but the value alone does not establish an intentional attempt to bypass scoped storage or permission restrictions.
 
-**Additional indicator:** App targets `targetSdkVersion=28` (Android 9) deliberately to bypass modern scoped-storage and permission restrictions.
-
 ---
 
 ## Detection & Hunting
@@ -485,6 +487,7 @@ rule RomanceScam_FeiQQ_APK {
 }
 ```
 > *Note: YARA strings are intentionally left un-defanged, because the rule must match the literal bytes in the sample. All network indicators elsewhere in this document are defanged.*
+> **Detection limitations:** This is a lightweight triage rule, not a ZIP-aware APK parser. Depending on archive compression, strings stored inside `classes.dex` may not be visible when scanning the raw APK file. Validate the rule against the original sample and benign APKs. For more reliable coverage, scan extracted DEX files and resources separately.
 ---
 
 ## What Is NOT Published
