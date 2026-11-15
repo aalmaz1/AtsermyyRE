@@ -404,11 +404,15 @@ services, including AWS and RongCloud.
 PHONE_CONTROL_USER = "hxxps://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
 ```
 
-The application defines a control-related endpoint named `phone_control_user` under `mod=Receive`.
+The application defines a backend endpoint named `phone_control_user` under `mod=Receive` and contains an exported `MyWindowmanagerServiceRong` service.
 
-The APK also declares an exported `MyWindowmanagerServiceRong` service and requests `SYSTEM_ALERT_WINDOW`.
+The examined service code uses Android's `WindowManager` API, including `addView()` and `removeView()`, to manage floating UI elements. The application also requests `SYSTEM_ALERT_WINDOW`, which is associated with displaying overlays over other applications when the required special access is granted.
 
-These artifacts justify further investigation of possible remote UI-control functionality. However, the available evidence does not yet establish a complete server-command-to-overlay execution chain.
+Background timers and handlers update the floating interface.
+
+However, the examined evidence does not establish that backend responses trigger remote UI-control commands. No implementation using `AccessibilityService`, `dispatchGesture()`, `performClick()`, or synthetic touch-event injection was identified in the searched code.
+
+**Assessment:** Floating-window functionality is identified. Remote screen automation, simulated touch input, and tapjacking have not been demonstrated. The relationship between the `phone_control_user` endpoint and the floating-window operations requires further verification.
 
 ### Weak Encryption & WebView Configuration
 
