@@ -475,6 +475,24 @@ The examined `sendPhone` request does not include `timevoice` or `goldinfo_num` 
 
 The examined client code does not establish that the backend successfully deducts currency, finalizes an order, or calculates the cost using call duration. The server-side implementation and the exact meaning of the `phone_score` and `sendPhone` operations have not been independently verified.
 
+### Call Timer and Periodic Backend Requests
+
+The inspected voice-call implementation maintains an integer counter named `timevoice`. Its synthetic accessor increments the counter by one and stores the updated value.
+
+The service also maintains a string field named `goldinfo_num`. The examined timer-related code converts this value to an integer and uses a remainder operation (`rem-int/2addr`) with the `timevoice` counter.
+
+In the inspected `MyWindowmanagerServiceRong$3` code, the calculated remainder is compared with the string `"6"`. When the comparison succeeds, the code sends Handler message `0x4c6` through `changeImageHandler`.
+
+The audit also reports additional remainder comparisons involving values such as `400`, `500`, and `599`, associated with Handler messages `0x179`, `0x17a`, and `0x18f`. These additional mappings should be documented as confirmed only after their original Smali branches have been individually verified.
+
+The examined Handler implementations contain call paths to billing-related methods, including `deductgold()` and `sendOrder_id()`. The floating-window service's `0x16e` branch invokes `deductgold()` when the user's `sex` value is not `"2"`. The `0x18f` branch contains service-state and user-sex checks before invoking `sendOrder_id()`.
+
+The provided `SendVoiceActivity$1` fragment also shows a call to `deductgold()` in the `0x14d` branch, without an explicit `sex` check in that branch.
+
+The audit did not identify `goldinfo_num` as a direct parameter in the examined `phone_score` or `sendPhone` HTTP requests.
+
+**Assessment:** The client contains a timer-driven mechanism that uses a call-related counter and a configurable numeric value to schedule Handler events. Some of these paths invoke backend-related billing methods. This is consistent with periodic call-session checks or billing-related scheduling, but the exact charging interval, tariff calculation, and server-side deduction behavior have not been independently established.
+
 ### `phone_score` and `sendPhone` Request Flow
 
 The floating-window service implements a `deductgold()` method that submits a POST request to the backend endpoint:
