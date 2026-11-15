@@ -22,7 +22,7 @@ The following functionality was identified:
 1. Dating and communication features, including chat, video calls, and virtual gifts.
 2. Investment-related functionality involving USDT and financial products.
 3. Backend API operations for purchasing financial products, managing investments, and requesting withdrawals.
-4. Collection and storage of certain account and contact information, including plaintext credentials and authentication-related values in application preferences.
+4. Collection and storage of certain account and contact information, including plaintext login credentials in application SharedPreferences. Additional authentication-related values are present in the application's data model, but their persistence must be assessed individually.
 5. A secondary APK download and installation mechanism, subject to Android installation controls.
 
 **Payment card analysis:** Static analysis identified two hidden payment-form fields that appear intended for card number (PAN) and security code (CVV/CVC). The payment click handler reads these fields and invokes Base64 encoding, but the encoded return values are not captured. No code path populating these fields, persisting their values, or adding them to the examined payment request was identified. The payment request instead includes the cardholder name, phone number, and email address under the parameters `name`, `phone`, and `email`, respectively. The available evidence does not establish that PAN or CVV values are collected or transmitted through these fields.
@@ -41,7 +41,7 @@ The application communicates with backend infrastructure associated with `opppi[
 | SHA-256 | `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5` |
 | VirusTotal | [Report](https://www.virustotal.com/gui/file/2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5) |
 | Detection at time of check | 1/66 — *flagged by BitDefenderFalx as `Android.Riskware.Repack.RMDV` (PUA). An earlier scan showed 0/67. Scan results and engine counts may change over time.* |
-| Distribution | Sent directly via messenger (not Google Play) |
+| Reported distribution | Sent directly via messenger (not Google Play) |
 | Incident Date | October 19, 2026 (date of the scam attempt) |
 | **Infrastructure Status** | **Mitigated by AWS (Case #179395433200804)** |
 
@@ -62,10 +62,8 @@ Key findings from `AndroidManifest.xml`:
 
 - `MANAGE_EXTERNAL_STORAGE` — requests broad access to shared storage. Declaring this permission does not establish that the user granted the required special access or that the application actually accessed all shared files.
 - `SYSTEM_ALERT_WINDOW` — real Android special permission associated with drawing overlays over other apps. Actual overlay capability depends on the applicable Android version and whether the required special access has been granted. Overlay functionality can create clickjacking or phishing risks.
-- `SYSTEM_OVERLAY_WINDOW` — **non-standard / non-existent permission name**; declared in the
-  manifest but ignored by Android and grants no rights. Likely a developer typo or a legacy
-  custom-ROM artifact. It does **not** add overlay capability beyond `SYSTEM_ALERT_WINDOW`.
-- `REQUEST_INSTALL_PACKAGES` — install additional APKs outside Google Play.
+- `SYSTEM_OVERLAY_WINDOW` — not a standard Android platform permission name. Its declaration alone does not establish any additional overlay capability. Whether it is also declared as a custom application permission should be checked before concluding that Android ignores it entirely.
+- `REQUEST_INSTALL_PACKAGES` — allows the application to request installation of additional packages. Actual installation remains subject to Android's package-installation controls, including applicable unknown-source authorization and user interaction.
 - `RECEIVE_BOOT_COMPLETED` — allows the application to receive the boot-completed broadcast. Automatic startup depends on the presence and implementation of a corresponding receiver.
 - `DISABLE_KEYGUARD` — legacy permission associated with controlling keyguard behavior. Its presence does not prove that the application can bypass a secure device lock screen.
 - `READ_PHONE_STATE` — requests access to certain phone-state information. The exact data available depends on the Android version, granted permissions, and application implementation.
@@ -151,7 +149,7 @@ The only_usdt field in PMyInformation suggests that the application supports or 
 
 ---
 
-## Data Collected and Stored Insecurely
+## Sensitive Data Handling and Storage
 
 ![Payment data fields](images/pminformation_credit.png)
 
@@ -323,7 +321,7 @@ For the examined payment endpoint:
 
 `https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&mod=Pay&act=pay&api_version=pay`
 
-the inspected Smali code extracts the values `Pay` and `pay` from the URL, concatenates them without a separator, appends the locally stored `api_token_str`, and calculates the MD5 digest:
+The inspected Smali code extracts the values `Pay` and `pay` from the URL, concatenates them without a separator, appends `api_token_str` retrieved from the `PMyInformation` data model, and calculates the MD5 digest:
 
 ```text
 api_token = MD5("Paypay" + api_token_str)
@@ -341,7 +339,10 @@ The following is a preliminary mapping of observed application behavior to MITRE
 
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
-| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The APK was delivered directly through a messenger rather than an official app store. |
+| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The reported incident involved direct delivery of the APK through a
+messenger rather than an official app store. This mapping is based on
+the reported delivery method, not on an installation mechanism
+identified in the APK itself.|
 
 ---
 
@@ -406,7 +407,7 @@ The inspected response listener parses the server response into an `AllMsgVo` ob
 - `704`: sets the state to `notfreeman` and sends message `0x16e` to `changeImageHandler`.
 - Other response codes: also set the state to `notfreeman` and send message `0x16e`.
 
-The corresponding `handleMessage()` implementation in `MyWindowmanagerServiceRong$1` processes message `0x16e` by checking the user's `sex` value. If it is not equal to `"2"`, the service invokes `deductgold()`.
+The inspected portion of the `0x16e` branch in `MyWindowmanagerServiceRong$1.handleMessage()` checks the user's `sex` value and invokes `deductgold()` when it is not equal to `"2"`. The preceding portion of the branch was not included in the supplied excerpt, so additional conditions before this check cannot be ruled out.
 
 The examined `0x16e` branch does not show modifications to floating-window Views, window coordinates, dimensions, visibility, or `WindowManager.LayoutParams`.
 
@@ -430,7 +431,7 @@ The request includes `to_uid`, `check_score=2`, `from=2`, `a=w`, `ip`, `deviceNa
 
 The inspected response handler (`MyWindowmanagerServiceRong$2`) parses successful responses and checks whether `code` equals `"700"`.
 
-For this response code, it extracts `order_id` and `gold` from a `PhoneOrderinfo` object. The `order_id` value is assigned to the service's `order_id` field. Although `getGold()` is invoked, its return value is not captured in the examined callback.
+For this response code, the handler parses a `PhoneOrderinfo` object, retrieves `order_id`, and assigns it to the service's `order_id` field. It also invokes `getGold()`, but the return value is not captured in the examined callback. The inspected code therefore does not establish that the returned gold value is used to update the local balance.
 
 **3. Subsequent `sendPhone` request**
 
@@ -461,13 +462,13 @@ The audit identified two call paths for `sendOrder_id()`:
 
 The response listener (`MyWindowmanagerServiceRong$5`) only prints the response body to standard output. Its inspected `onSuccess()` implementation does not parse response fields or update the service state or UI. Its `onFailure()`, `onStart()`, and `onFinish()` methods are empty.
 
-**5. Additional call-timing and billing-related fields**
+**5. Additional call-related fields**
 
-The service also contains the following fields and operations:
+- The service contains a `goldinfo_num` field assigned from an `Intent` value.
+- The inspected `SendVoiceActivity.access$808()` accessor performs a post-increment on the Activity's `timevoice` field.
+- `deductgold()` submits `check_score` as the constant string `"2"`.
 
-- `goldinfo_num` is assigned from an `Intent` value.
-- `timevoice` is incremented by one in the inspected timer thread.
-- `check_score` is submitted as the constant string `"2"` in `deductgold()`.
+These observations concern separate fields and code paths. The inspected evidence does not establish that `timevoice` is transmitted to the backend or directly determines the value of `check_score`.
 
 The examined `sendPhone` request does not include `timevoice` or `goldinfo_num` among its parameters.
 
@@ -475,11 +476,24 @@ The examined `sendPhone` request does not include `timevoice` or `goldinfo_num` 
 
 The examined client code does not establish that the backend successfully deducts currency, finalizes an order, or calculates the cost using call duration. The server-side implementation and the exact meaning of the `phone_score` and `sendPhone` operations have not been independently verified.
 
-### Timer-Driven Handler Events and Billing-Related Methods
+### Timer-Driven Handler Events
 
-The background thread in `MyWindowmanagerServiceRong$3.run()` calls Thread.sleep(1000) and then invokes the service counter accessor access$1208(). The inspected run() method subsequently reads the counter and performs modulo comparisons. The implementation of access$1208() itself has not yet been verified in the examined evidence, so the exact counter update performed by that accessor should not be inferred from its name.. The method then reads the counter and calculates its remainder using an integer value parsed from a string.
+The background thread in `MyWindowmanagerServiceRong$3.run()` calls
+`Thread.sleep(1000)` and then invokes the service accessor
+`access$1208()`. The method subsequently reads the counter through
+`access$1200()` and performs modulo comparisons using an integer value
+parsed from a string returned by `access$1300()`.
 
-The inspected method contains four independent remainder comparisons:
+The implementation of `access$1208()` itself has not yet been verified.
+Therefore, the exact counter update performed by that accessor should
+not be inferred from its name.
+
+The implementation of `checkgold(I)V` has not yet been independently
+audited. The inspected Handler branches establish that the method is
+invoked with arguments `0x179` and `0x17a`, but its internal behavior
+and any resulting financial operations remain unverified.
+
+The inspected method contains four separate remainder comparisons:
 
 | Remainder | Handler message |
 |---:|---:|
@@ -490,15 +504,20 @@ The inspected method contains four independent remainder comparisons:
 
 When a comparison succeeds, the corresponding message is sent through `MyWindowmanagerServiceRong.changeImageHandler`.
 
-The corresponding `MyWindowmanagerServiceRong$1.handleMessage()` branches perform different actions:
+The inspected `MyWindowmanagerServiceRong$1.handleMessage()` method contains the following branches. The inspected `run()` method generates four message codes: `0x4c6`, `0x179`, `0x17a`, and `0x18f`. Message `0x16e` is handled separately and is not generated by that timer loop:
 
 - **`0x4c6`:** Constructs HTTP request parameters and invokes the service request helper. The inspected excerpt does not include the complete parameter construction.
 - **`0x179`:** Checks the `freeman` state and the user's `sex` value. If `freeman` is not `"freeman"` and `sex` is not `"2"`, it invokes `checkgold(0x179)` on the enclosing `MyWindowmanagerServiceRong` instance.
 - **`0x17a`:** Applies the same state and sex checks, then invokes `checkgold(0x17a)` on the enclosing service instance.
-- **`0x16e`:** The shown portion of the branch checks the user's `sex` value and invokes `deductgold()` on the enclosing service instance when it is not equal to `"2"`. The preceding portion of this branch was not included in the inspected excerpt, so additional conditions before the sex check cannot be ruled out. This message is handled by the service but is not among the four messages generated by the inspected `run()` method.
+- **`0x16e`:** The inspected portion of the branch checks the user's
+  `sex` value and invokes `deductgold()` when it is not equal to `"2"`.
+  The preceding portion of the branch was omitted from the supplied
+  excerpt, so additional conditions before this check cannot be ruled out.
+  This message is handled by the service but is not among the four
+  messages generated by the inspected `run()` method.
 - **`0x18f`:** Checks the `freeman` state and the user's `sex` value, then invokes `sendOrder_id()` on the enclosing service instance when the conditions permit.
 
-**Assessment:** The inspected service implements modulo-based scheduling of distinct Handler events. These events trigger different backend-related operations: a request-helper path, two `checkgold()` calls, a `deductgold()` call, and a `sendOrder_id()` call. The inspected client-side instructions establish the scheduling and method invocation paths, but do not independently prove successful server-side balance deductions.
+**Assessment:** The inspected service implements modulo-based scheduling of four Handler messages: `0x4c6`, `0x179`, `0x17a`, and `0x18f`. Their inspected branches invoke a request-helper path, two `checkgold()` calls, and `sendOrder_id()`, respectively. The separate `0x16e` branch invokes `deductgold()` under the conditions shown in the inspected portion of that branch; it is not one of the four messages generated by the examined `run()` method. These client-side instructions establish method invocation paths, but do not independently prove successful server-side balance deductions.
 
 ### Voice Activity Counter and Handler
 
@@ -563,13 +582,13 @@ The attribution of the bucket name, region, and storage prefix should therefore 
 
 ### Cloud & Infrastructure Keys (Redacted)
 
-The application hardcodes several API keys used for its infrastructure. Values are partially redacted for ethical disclosure:
+The application contains several hardcoded infrastructure-related identifiers, keys, and configuration values. Values are partially redacted for ethical disclosure:
 
 - **RongCloud App Key:** `n19jm...` *(Used for IM and video calls)*
-- - **AWS Access Key:** `AKIA...` *(Hardcoded AWS-related key identified in the application; its exact role in the examined S3 upload path has not been established.)*
+- **AWS Access Key:** `AKIA...` *(Hardcoded AWS-related key identified in the application; its exact role in the examined S3 upload path has not been established.)*
 - **Firebase Project:** `ccatsov` 
   *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
-- - **AWS IP Check:** `hxxps://checkip[.]amazonaws[.]com`
+- **AWS IP Check:** `hxxps://checkip[.]amazonaws[.]com`
   *(Used to obtain the public egress IP address observed by the external service; the returned value is added to the payment API request.)*
 
 ### Resources & Assets Analysis
@@ -625,7 +644,6 @@ resource files.
 - External payment gateway URL:
   `hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
   *(URL recovered from Base64Utils.smali; its operational role and relationship to the op ppi.com payment API have not been established.)*
-- Hardcoded `api_token`: `B13B-(redacted; full value available on request for verified researchers)A7F` (used in upload/S3 requests)
 
 ### APK Signing Certificate (Developer Identity)
 
@@ -654,7 +672,7 @@ To ensure the accuracy of the extracted indicators, several external checks were
 
 - **APK Certificate SHA-256:** Queried on VirusTotal. Result: **No matches found** No matches were returned for the certificate SHA-256 in the
 VirusTotal query performed at the time of checking. This does not
-establish when or for whom the certificate was created..
+establish when or for whom the certificate was created.
 - **Firebase Project (`ccatsov`):** Checked `ccatsov[.]firebaseio[.]com/.json`. Result: The request to ccatsov[.]firebaseio[.]com/.json returned HTTP 404.
 This does not establish whether Realtime Database is disabled,whether another database configuration exists, or which Firebase services are used by the application.
 - **Skype ID (`yuan.zi4`):** Searched via Google and public databases. Result: **No public scam reports or correlations found at the time of check.**
@@ -693,7 +711,7 @@ To detect this specific campaign or similar threats:
 
 **Endpoint (Android):**
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
-- Inspect `SharedPreferences("MyInformation")` for plaintext account credentials and authentication-related values such as `user`, `pass`, `osskey`, `osssecre`, `securityToken`, `api_token_str`, and `rongImToken`.
+- Inspect `SharedPreferences("MyInformation")` for plaintext account credentials, including `user` and `pass`. Other authentication-related values, such as `api_token_str` and `rongImToken`, should only be treated as persistent indicators where their actual SharedPreferences write paths have been verified. The examined AWS setters (`setOsskey`, `setOsssecre`, and `setSecurityToken`) perform in-memory assignments; persistence through these setters was not identified.
 
 ---
 
