@@ -154,49 +154,66 @@ The only_usdt field in PMyInformation suggests that the application supports or 
 
 ![Payment data fields](images/pminformation_credit.png)
 
-### Payment Card Data Collection and Exfiltration
+### Payment Card Data Collection, Local Storage and Restoration
 
-Static analysis of `PayNew_Activity$myOnClick.smali` confirmed that the application directly reads payment data from UI input fields.
+Static analysis of `PayNew_Activity$myOnClick.smali` and `PayNew_Activity.smali` confirms that the application collects payment form data, stores it in Android SharedPreferences, and restores previously stored values when the payment Activity is initialized.
 
 **Identified data flows:**
 
-| Data | UI source | SharedPreferences file | Preference key | HTTP parameter |
+| Data | UI field | SharedPreferences file | Preference key | HTTP parameter |
 |---|---|---|---|---|
 | Card number (PAN) | `et_name_72` | `sp_name_win_ed` | `sp_name_win_ed` | `name` |
-| Card security code (CVV) | `et_name_162` | `sp_phone_win_ed` | `sp_phone_win_ed` | `phone` |
+| Card security code (CVV/CVC) | `et_name_162` | `sp_phone_win_ed` | `sp_phone_win_ed` | `phone` |
 | Postal code | `et_name_182` | `sp_email_win_ed` | `sp_email_win_ed` | `email` |
 
-The payment handler retrieves the values using `EditText.getText()` and `toString()`.
+**1. Local storage**
 
-**Local storage:**
+The payment submission handler reads the values from the corresponding `EditText` fields using `getText().toString()`.
 
-The application opens the corresponding SharedPreferences stores and writes the collected values using `SharedPreferences.Editor.putString()`, followed by `commit()`.
+Each value is stored in a separate SharedPreferences file using `SharedPreferences.Editor.putString()`, followed by `commit()`.
 
-The Activity also uses previously stored PAN and CVV values to populate the corresponding payment form fields.
+**2. Restoration of previously stored values**
 
-**Network transmission:**
+The `PayNew_Activity.onCreate()` method retrieves the stored values using `SharedPreferences.getString()`.
 
-The payment handler inserts the collected values into an `AbRequestParams` object. The same object is passed through:
+The following restoration chains were identified:
+
+- `sp_name_win_ed` → `sp_name` → `et_name_72.setText()` (PAN).
+- `sp_phone_win_ed` → `sp_phone` → `et_name_162.setText()` (CVV/CVC).
+- `sp_email_win_ed` → `sp_email` → `et_name_182.setText()` (postal code).
+
+Before populating each field, the application checks the retrieved value using `TextUtils.isEmpty()`.
+
+This confirms that previously stored payment information is automatically restored to the corresponding form fields when the Activity is initialized, provided that the stored values are non-empty.
+
+**3. Network transmission**
+
+The submission handler inserts the collected values into an `AbRequestParams` object using the following parameter names:
+
+| HTTP parameter | Actual content |
+|---|---|
+| `name` | Card number (PAN) |
+| `phone` | Card security code (CVV/CVC) |
+| `email` | Postal code |
+
+The request parameters are passed through the following call chain:
 
 `PayNew_Activity$myOnClick.onClick()` → `access$1800()` → `setWeb()` → `AbHttpUtil.post()`.
 
-The request is sent to:
+The identified endpoint is:
 
 `https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&mod=Pay&act=pay&api_version=pay`
 
-The parameter names do not reflect their actual contents:
+**Assessment**
 
-- `name` contains the card number (PAN).
-- `phone` contains the card security code (CVV).
-- `email` contains the postal code.
+The examined code establishes the following behaviors:
 
-**Expiration date:**
+- Collection of PAN and CVV/CVC from payment form fields.
+- Local persistence of payment data in separate SharedPreferences files.
+- Automatic restoration of previously stored values into the payment form.
+- Preparation of PAN, CVV/CVC and postal code as HTTP POST request parameters.
 
-The expiration month and year are read by the examined handler, but the traced code does not place them in the identified SharedPreferences or HTTP request parameter flows.
-
-**Assessment:**
-
-The examined code confirms client-side collection of PAN and CVV, local storage operations, and submission of these values to the HTTP client through a POST request to the payment API endpoint. Server-side processing and retention of the submitted data have not been independently established.
+The code establishes client-side request submission, but does not independently prove successful server-side receipt, processing, or retention of the submitted information.
 
 ### PMyInformation Data Model
 
