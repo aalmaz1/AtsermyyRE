@@ -40,7 +40,7 @@ The application communicates with backend infrastructure associated with `opppi[
 | Package name | `com.FeiQQ.FeiQQ` |
 | SHA-256 | `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5` |
 | VirusTotal | [Report](https://www.virustotal.com/gui/file/2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5) |
-| Detection at time of check | 1/66 — *flagged by BitDefenderFalx as `Android.Riskware.Repack.RMDV` (PUA). Note: initial scan showed 0/67, highlighting the delay in signature updates.* |
+| Detection at time of check | 1/66 — *flagged by BitDefenderFalx as `Android.Riskware.Repack.RMDV` (PUA). An earlier scan showed 0/67. Scan results and engine counts may change over time.* |
 | Distribution | Sent directly via messenger (not Google Play) |
 | Incident Date | October 19, 2026 (date of the scam attempt) |
 | **Infrastructure Status** | **Mitigated by AWS (Case #179395433200804)** |
@@ -61,8 +61,7 @@ The application communicates with backend infrastructure associated with `opppi[
 Key findings from `AndroidManifest.xml`:
 
 - `MANAGE_EXTERNAL_STORAGE` — requests broad access to shared storage. Declaring this permission does not establish that the user granted the required special access or that the application actually accessed all shared files.
-- `SYSTEM_ALERT_WINDOW` — real Android permission; allows drawing overlays over other apps
-  (clickjacking / phishing risk).
+- `SYSTEM_ALERT_WINDOW` — real Android special permission associated with drawing overlays over other apps. Actual overlay capability depends on the applicable Android version and whether the required special access has been granted. Overlay functionality can create clickjacking or phishing risks.
 - `SYSTEM_OVERLAY_WINDOW` — **non-standard / non-existent permission name**; declared in the
   manifest but ignored by Android and grants no rights. Likely a developer typo or a legacy
   custom-ROM artifact. It does **not** add overlay capability beyond `SYSTEM_ALERT_WINDOW`.
@@ -262,7 +261,7 @@ by itself establish that card data is populated, stored, or transmitted.
 Additional analysis of `PMyInformation.smali` identified storage of:
 
 - **Password** (`pass`) and **login** (`user`) in plaintext in `SharedPreferences("MyInformation")`.
-- **AWS-related values** (`osskey`, `osssecre`), **STS token** (`securityToken`), **API token material** (`api_token_str`), **RongCloud token** (`rongImToken`), and session-related values in the same preference store.
+- **Authentication-related values:** the `PMyInformation` model contains fields for AWS-related values (`osskey`, `osssecre`, `securityToken`), API token material (`api_token_str`), RongCloud token (`rongImToken`), and session-related data. The inspected AWS setters only assign values in memory; persistent storage of these AWS credentials through those setters was not identified. Other values, including the account login and password, are stored in plaintext in `SharedPreferences("MyInformation")`.
 
 The `toString()` implementation includes payment-related fields and other sensitive model values. This creates a potential exposure risk if populated instances are logged. Actual logging of populated card data has not been established.
 
@@ -270,14 +269,49 @@ The `toString()` implementation includes payment-related fields and other sensit
 
 ## Cloud Storage (AWS S3)
 
-- The app obtains **temporary AWS credentials** from its own server
-  (`mod=Upload&act=get_sts_token`).
-- Uploads/downloads go to the S3 bucket `hk-attach`, region `ap-east-1`.
-- The examined application configuration and upload-related code
-  indicate that user photos can be uploaded to an S3 bucket named
-  `hk-attach` in the `ap-east-1` region, under the `privatealbum` prefix.
-- This does not establish that these files exist exclusively in S3
-  or that local copies are never retained on the device.
+The application requests AWS-related credentials from its backend through the
+`Upload/get_sts_token` API endpoint.
+
+The inspected response handler parses the JSON response and extracts:
+- `AccessKeyId`
+- `AccessKeySecret`
+- `SecurityToken`
+- `Expiration`
+
+The access key ID and secret key are assigned to fields in
+`AwsPhotoDetilesActivity` and passed to the application's `PMyInformation`
+model. The inspected setters (`setOsskey`, `setOsssecre`, and
+`setSecurityToken`) only assign in-memory fields. No SharedPreferences or
+SQLite persistence was identified in these setter implementations.
+
+The examined S3 upload client is constructed using
+`BasicAWSCredentials(String accessKeyId, String secretKey)`.
+The `SecurityToken` extracted from the backend response is not passed
+to this constructor.
+
+The examined upload path uses:
+- Bucket: `hk-attach`
+- Region: `ap-east-1`
+- Object key: value obtained from `fileStr`
+- Local file: `File(fileStr)`
+
+The code subsequently constructs a `PutObjectRequest` and invokes
+`AmazonS3.putObject()`.
+
+**Security observation:** If the backend supplies temporary AWS STS
+credentials, the examined client construction does not provide the
+associated session token through the credentials object. AWS temporary
+credentials normally require the session token for authenticated requests.
+Therefore, the inspected implementation appears incompatible with
+temporary STS credentials unless another session-token mechanism is involved.
+
+Static analysis confirms the presence of the upload call, but does not
+independently establish successful uploads, successful AWS authentication,
+or server-side storage.
+
+No S3 download implementation was identified in the examined code.
+The string `privatealbum` was found, but its use as the object key or
+an S3 prefix was not established.
 
 ---
 
@@ -432,7 +466,7 @@ The attribution of the bucket name, region, and storage prefix should therefore 
 The application hardcodes several API keys used for its infrastructure. Values are partially redacted for ethical disclosure:
 
 - **RongCloud App Key:** `n19jm...` *(Used for IM and video calls)*
-- **AWS Access Key:** `AKIA...` *(Used for S3 bucket `hk-attach`)*
+- - **AWS Access Key:** `AKIA...` *(Hardcoded AWS-related key identified in the application; its exact role in the examined S3 upload path has not been established.)*
 - **Firebase Project:** `ccatsov` 
   *(Firebase App ID: `1:4233...`, API Key: `AIza...`)*
 - - **AWS IP Check:** `hxxps://checkip[.]amazonaws[.]com`
@@ -481,8 +515,8 @@ resource files.
 - USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
 - Skype ID: `yuan.zi4`
 - Support email: `Onlinedating999[@]proton[.]me`
-- S3 bucket: `hk-attach` (region `ap-east-1`)
-- S3 prefix: `privatealbum`
+- S3 bucket: `hk-attach` (region `ap-east-1`; identified in the examined `PutObjectRequest` construction)
+- S3 object key: derived from the `fileStr` field in the examined upload path
 - SharedPreferences file: `MyInformation`
 - IM provider: RongCloud (`io.rong.*`)
 - Package name: `com.FeiQQ.FeiQQ`
