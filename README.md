@@ -244,7 +244,16 @@ The separate `PMyInformation.smali` class declares fields associated with paymen
 - `name_first`
 - `name_second`
 
-The class also contains a `SharedPreferences` reference. However, the identified payment collection flow does not rely on these card fields. Instead, it reads PAN and CVV directly from the payment form and stores them using the separate preference names documented above.
+The class also contains a SharedPreferences reference. However, the
+identified payment handler does not use these model fields to construct
+the examined payment request.
+
+Although the handler reads two hidden PAN-like and CVV/CVC-like form
+fields and invokes Base64 encoding, no corresponding persistence or
+request-parameter flow was identified in the examined code.
+
+The presence of these fields in the PMyInformation data model does not
+by itself establish that card data is populated, stored, or transmitted.
 
 ### Other Sensitive Application Data
 
@@ -524,12 +533,10 @@ To detect this specific campaign or similar threats:
 - Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5[.]cloudfront[.]net`.
 - Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
 - Monitor POST requests to `/api.php` with `mod=Pay&act=pay`.
-- Inspect payment request parameters `name`, `phone`, and `email` for unexpected submission of card data and postal codes.
 
 **Endpoint (Android):**
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
 - Inspect `SharedPreferences("MyInformation")` for plaintext account credentials and authentication-related values such as `user`, `pass`, `osskey`, `osssecre`, `securityToken`, `api_token_str`, and `rongImToken`.
-- Inspect the payment-related SharedPreferences stores `sp_name_win_ed`, `sp_phone_win_ed`, and `sp_email_win_ed` for potentially retained payment form values.
 
 ---
 
