@@ -412,6 +412,37 @@ The examined `0x16e` branch does not show modifications to floating-window Views
 
 **Assessment:** The examined endpoint response is associated with application account/service-status and billing logic. The inspected response-to-handler path does not demonstrate remote control of the floating window, remote screen automation, simulated touch input, or tapjacking. Other message-handler branches and unrelated service methods should be assessed separately before making broader claims about all floating-window behavior.
 
+### Phone Score API and Billing-Related Logic
+
+The service implements a method named `deductgold()` that conditionally submits an HTTP POST request to the backend endpoint:
+
+`/api.php?ap=2&client_id=1&abc=1&mod=Send&act=phone_score&api_version=message`
+
+Before submitting the request, the method checks whether the current user UID matches the service's `goldinfo_uid` field.
+
+The request includes:
+- `to_uid`
+- `check_score=2`
+- `from=2`
+- `a=w`
+- `ip`
+- `deviceName`
+- `client` (current user UID)
+- `from_uid` (current user UID)
+- `api_token` (client-side MD5-derived value)
+
+The request is submitted using `AbHttpUtil.post()`.
+
+The inspected response listener (`MyWindowmanagerServiceRong$2`) parses successful responses using FastJSON and checks whether `code` equals `"700"`. For that response code, it extracts `order_id` and `gold` from a `PhoneOrderinfo` object.
+
+The `order_id` value is assigned to the service's `order_id` field. Although `gold` is retrieved through `getGold()`, its return value is not captured or used in the inspected callback.
+
+No local balance update, UI update, or persistence of these response values was identified in the examined callback. The `onFailure()` implementation is empty.
+
+**Assessment:** The client-side code confirms a billing- or score-related backend request and the extraction of order information. It does not establish that currency is actually deducted by the backend, nor does it demonstrate a local balance update. Server-side billing behavior has not been independently verified.
+
+The `deductgold()` method is reportedly invoked both from the floating-window service and from voice-call Activity code. Therefore, this functionality is not exclusive to the floating window.
+
 ### Weak Encryption & WebView Configuration
 
 - **DES encryption** is used in `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity` (`const-string v7, "des"`). DES is cryptographically broken (56-bit key) and unsuitable for protecting chat messages.
