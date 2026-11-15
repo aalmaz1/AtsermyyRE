@@ -12,18 +12,23 @@
 
 ## Executive Summary
 
-An Android application (`com.FeiQQ.FeiQQ`) was received outside of any official app store
-from a person met online, who then suggested installing it. The APK does not exist in Google Play, and no legitimate publisher was identified.
-Static analysis shows it is a **dating-themed
-application with a hidden investment module** — a classic **pig butchering / romance scam**
-pattern:
+An Android application (`com.FeiQQ.FeiQQ`) was received outside an official app store from a person met online who subsequently encouraged its installation.
 
-1. Trust is built through a dating interface (chat, video calls, gifts).
-2. The victim is gradually pushed to "invest" USDT via the app.
-3. Withdrawal is controlled by the operator's server and is effectively blocked.
+Static analysis identified a dating-themed application containing an integrated cryptocurrency investment and payment module. The combination of online relationship-building features, USDT-related investment functionality, and financial operations is consistent with patterns associated with **romance-investment scams (pig butchering)**.
 
-The application also collects **full payment card data** and stores the user's
-**password and AWS credentials in plaintext**.
+The following functionality was identified:
+
+1. Dating and communication features, including chat, video calls, and virtual gifts.
+2. Investment-related functionality involving USDT and financial products.
+3. Backend API operations for purchasing financial products, managing investments, and requesting withdrawals.
+4. Collection and storage of certain account and contact information, including plaintext credentials and authentication-related values in application preferences.
+5. A secondary APK download and installation mechanism, subject to Android installation controls.
+
+**Payment card analysis:** Static analysis confirmed that the application reads payment card numbers (PAN) and CVV directly from payment form fields, stores these values in SharedPreferences under generic names, and submits them through an HTTP POST request to the application's payment API endpoint at `www[.]opppi[.]com`. The PAN is submitted as the `name` parameter, and the CVV as the `phone` parameter. The postal code is also stored and submitted under generic names. The examined handler reads the expiration month and year but does not include them in the identified storage or request-parameter flows.
+
+The application communicates with backend infrastructure associated with `opppi[.]com` and uses third-party services, including RongCloud and AWS infrastructure.
+
+**Assessment:** The APK exhibits functionality and infrastructure consistent with a suspected romance-investment scam. This assessment is based on static analysis of the application and available infrastructure artifacts; it does not independently establish the identity of the operators or the outcome of every financial transaction.
 
 ---
 
@@ -87,12 +92,13 @@ Key findings from `AndroidManifest.xml`:
 
 ### Insecure Configuration Flags
 
-- `android:allowBackup="true"` + **no `dataExtractionRules`** — all `SharedPreferences` (including plaintext password, AWS keys, API token) can be extracted via `adb backup`.
-- `android:usesCleartextTraffic="true"` — HTTP without encryption is allowed.
-- `android:requestLegacyExternalStorage="true"` + `MANAGE_EXTERNAL_STORAGE` — double bypass of Android 10+ scoped storage.
-- `android:largeHeap="true"` — requested large heap (typical for media processing or hidden heavy activity).
-- `android:debuggable="false"` — good, but doesn't protect against backup extraction.
-- **`<queries>` block: not found** — the app does not declare package-visibility. It likely enumerates installed apps via `getInstalledPackages` (does not require `<queries>`) or via native code.
+- `android:allowBackup="true"` — enables Android backup behavior where supported. Because no explicit backup-exclusion configuration was identified, application data may be included in backups depending on Android version, backup transport, device policy, and other platform restrictions. Extraction through `adb backup` was not independently demonstrated.
+- `android:usesCleartextTraffic="true"` — permits cleartext network traffic under the applicable Android network security configuration. This setting alone does not prove that the application actually transmits data over HTTP.
+- `android:requestLegacyExternalStorage="true"` — requests legacy external-storage behavior on supported Android versions. Its effect depends on the Android version and target SDK; it should not be described as a permission bypass.
+- `android:largeHeap="true"` — requests a larger application heap. This is not evidence of malicious behavior by itself.
+- `android:debuggable="false"` — indicates that the application is not configured as debuggable in its manifest.
+
+No `fullBackupContent`, `dataExtractionRules`, or `networkSecurityConfig` declaration was identified in the examined manifest.
 
 ### Backup & Extraction Rules
 
@@ -137,33 +143,86 @@ mod=Capital&act=getUserCapitalInfo
 ![Investment strings](images/strings_changtou.png)
 *Localized strings of the investment module (`usdt 起購`, `世界金融產品理財`, `Expected T+1 arrival`).*
 
-The field `only_usdt` in `PMyInformation` indicates the app is designed to work
-**only with USDT** — a common trait of pig butchering schemes, since crypto transfers
-are hard to reverse.
+The only_usdt field in PMyInformation suggests that the application supports or configures a USDT-specific operating mode. Its exact effect depends on where and how this field is consumed.
 
 ---
 
 ## Data Collected and Stored Insecurely
 
 ![Payment data fields](images/pminformation_credit.png)
-*`PMyInformation` contains fields for full card data.*
 
-The model `PMyInformation` includes:
+### Payment Card Data Collection and Exfiltration
 
-- `credit_card_number`, `credit_validity_mouth` (sic), `credit_validity_year`,
-  `credit_security_code` (CVV), `credit_zip_code`, `credit_address`,
-  `credit_city`, `credit_state`, `credit_county`, `credit_telephone`, `credit_email`,
-  `name_first`, `name_second`.
+Static analysis of `PayNew_Activity$myOnClick.smali` confirmed that the application directly reads payment data from UI input fields.
 
-Additional issues:
+**Identified data flows:**
 
-- **Password** (`pass`) and **login** (`user`) are stored in plaintext in
-  `SharedPreferences("MyInformation")`.
-- **AWS credentials** (`osskey`, `osssecre`), **STS token** (`securityToken`),
-  **API token** (`api_token_str`), **RongCloud token** (`rongImToken`) and
-  **session id** are also stored there, unencrypted.
-- `toString()` prints **all** fields, including password, card number and CVV —
-  a leak risk if logged.
+| Data | UI source | SharedPreferences file | Preference key | HTTP parameter |
+|---|---|---|---|---|
+| Card number (PAN) | `et_name_72` | `sp_name_win_ed` | `sp_name_win_ed` | `name` |
+| Card security code (CVV) | `et_name_162` | `sp_phone_win_ed` | `sp_phone_win_ed` | `phone` |
+| Postal code | `et_name_182` | `sp_email_win_ed` | `sp_email_win_ed` | `email` |
+
+The payment handler retrieves the values using `EditText.getText()` and `toString()`.
+
+**Local storage:**
+
+The application opens the corresponding SharedPreferences stores and writes the collected values using `SharedPreferences.Editor.putString()`, followed by `commit()`.
+
+The Activity also uses previously stored PAN and CVV values to populate the corresponding payment form fields.
+
+**Network transmission:**
+
+The payment handler inserts the collected values into an `AbRequestParams` object. The same object is passed through:
+
+`PayNew_Activity$myOnClick.onClick()` → `access$1800()` → `setWeb()` → `AbHttpUtil.post()`.
+
+The request is sent to:
+
+`https://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&mod=Pay&act=pay&api_version=pay`
+
+The parameter names do not reflect their actual contents:
+
+- `name` contains the card number (PAN).
+- `phone` contains the card security code (CVV).
+- `email` contains the postal code.
+
+**Expiration date:**
+
+The expiration month and year are read by the examined handler, but the traced code does not place them in the identified SharedPreferences or HTTP request parameter flows.
+
+**Assessment:**
+
+The examined code confirms client-side collection of PAN and CVV, local storage operations, and submission of these values to the HTTP client through a POST request to the payment API endpoint. Server-side processing and retention of the submitted data have not been independently established.
+
+### PMyInformation Data Model
+
+The separate `PMyInformation.smali` class declares fields associated with payment information:
+
+- `credit_card_number`
+- `credit_validity_mouth`
+- `credit_validity_year`
+- `credit_security_code`
+- `credit_zip_code`
+- `credit_address`
+- `credit_city`
+- `credit_state`
+- `credit_county`
+- `credit_telephone`
+- `credit_email`
+- `name_first`
+- `name_second`
+
+The class also contains a `SharedPreferences` reference. However, the identified payment collection flow does not rely on these card fields. Instead, it reads PAN and CVV directly from the payment form and stores them using the separate preference names documented above.
+
+### Other Sensitive Application Data
+
+Additional analysis of `PMyInformation.smali` identified storage of:
+
+- **Password** (`pass`) and **login** (`user`) in plaintext in `SharedPreferences("MyInformation")`.
+- **AWS-related values** (`osskey`, `osssecre`), **STS token** (`securityToken`), **API token material** (`api_token_str`), **RongCloud token** (`rongImToken`), and session-related values in the same preference store.
+
+The `toString()` implementation includes payment-related fields and other sensitive model values. This creates a potential exposure risk if populated instances are logged. Actual logging of populated card data has not been established.
 
 ---
 
@@ -192,9 +251,9 @@ requests can be forged.
 
 ---
 
-## 🎯 MITRE ATT&CK for Mobile Mapping
+## 🎯 MITRE ATT&CK for Mobile — Preliminary Mapping
 
-The following table maps the observed artifacts and malicious functionality of the `com.FeiQQ.FeiQQ` application to the official **MITRE ATT&CK for Mobile** matrix. Each technique is validated against the official MITRE definition and supported by concrete evidence from the APK.
+The following is a preliminary mapping of observed application behavior to MITRE ATT&CK for Mobile. Technique applicability depends on the demonstrated behavior, not merely on manifest permissions or the presence of related API calls.
 
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
@@ -202,8 +261,8 @@ The following table maps the observed artifacts and malicious functionality of t
 | **Execution** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Auto-start on boot via `RECEIVE_BOOT_COMPLETED` and handling of system events (`USER_PRESENT`, `POWER_CONNECTED/DISCONNECTED`). |
 | **Persistence** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Persistence via Broadcast Receivers (`PushReceiver`, `FirebaseInstanceIdReceiver`). |
 | **Defense Evasion** | **[T1406](https://attack.mitre.org/techniques/T1406/)** | Obfuscated Files or Information | Base64-encoded payment URLs (`aHR0cHM6Ly8wbmxpbmVwYXku...` → `https://0nlinepay[.]com/...` in `Base64Utils.smali`). |
-| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | **Potential phishing mechanism:** Use of `VisaWebActivity` (JS enabled, file access) and `SYSTEM_ALERT_WINDOW` to display fake forms and capture input over other apps. |
-| | **[T1409](https://attack.mitre.org/techniques/T1409/)** | Access Stored Application Data | Plaintext storage of session tokens, credentials, and configuration in `SharedPreferences("MyInformation")`. |
+| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | Confirmed payment-form input collection: PAN and CVV are read directly from EditText fields and submitted through the payment API request. See PayNew_Activity$myOnClick.smali. |
+| 
 | **Discovery** | **[T1426](https://attack.mitre.org/techniques/T1426/)** | System Information Discovery | Collection of device identifiers (`Build.MODEL`, `Build.VERSION.RELEASE`, `TelephonyManager`) in `WelcomeActivity.smali` and `NewTaskActivity.smali`. |
 | | **[T1420](https://attack.mitre.org/techniques/T1420/)** | File and Directory Discovery | Request for direct filesystem access via `MANAGE_EXTERNAL_STORAGE` and `READ/WRITE_EXTERNAL_STORAGE`. |
 | | **[T1430](https://attack.mitre.org/techniques/T1430/)** | Location Tracking | Request for precise and approximate location via `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`. |
@@ -339,7 +398,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 
 > Defanged for safety.
 
-- C2 domain: `opppi[.]com`
+- Application backend / payment API domain: opppi[.]com
 - Image domain: `image[.]opppi[.]com`
 - Subdomain: `test[.]opppi[.]com` (historically active, cert issued 2025-11-19, currently no DNS record)
 - USDT TRC-20 Wallet: `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
@@ -351,7 +410,7 @@ The resources contain admin/test UI strings, consistent with a reused dating-app
 - IM provider: RongCloud (`io.rong.*`)
 - Package name: `com.FeiQQ.FeiQQ`
 - SHA-256: `2e9adbcfeb966e70029b4fead160c08b278276067466137973965fe97936a4c5`
-- Payment C2 domain: `0nlinepay[.]com` (homoglyph of "onlinepay"; hardcoded base64 in `Base64Utils.smali`)
+- External payment gateway domain: 0nlinepay[.]com (digit 0 instead of letter o; URL recovered from Base64Utils.smali). Its exact operational role has not been independently established.
 - Payment API path: `hxxps://0nlinepay[.]com/Payment/payConsoleNavi.aspx`
 - Hardcoded `api_token`: `B13B-(redacted; full value available on request for verified researchers)A7F` (used in upload/S3 requests)
 
@@ -385,7 +444,7 @@ To ensure the accuracy of the extracted indicators, several external checks were
 - Downloads to `/sdcard/download/` via `HttpURLConnection`
 - Uses intent `application/vnd.android.package-archive` with `FLAG_ACTIVITY_NEW_TASK`
 - Requires `REQUEST_INSTALL_PACKAGES` (declared in manifest)
-- This provides a potential mechanism for delivering a secondary payload, subject to Android's unknown-source installation controls and user confirmation. This is a classic **Dropper** pattern — the app can attempt to push new malware (banking trojan, ransomware) post-install, bypassing Google Play review.
+- This provides a potential mechanism for delivering a secondary payload, subject to Android's unknown-source installation controls and user confirmation.This is consistent with a secondary APK delivery mechanism. The downloaded payload may be different from the original application, but its functionality has not been established. Installation remains subject to Android's unknown-source installation controls and user confirmation.
 
 **Additional indicator:** App targets `targetSdkVersion=28` (Android 9) deliberately to bypass modern scoped-storage and permission restrictions.
 
@@ -398,10 +457,13 @@ To detect this specific campaign or similar threats:
 **Network:**
 - Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5[.]cloudfront[.]net`.
 - Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
+- Monitor POST requests to `/api.php` with `mod=Pay&act=pay`.
+- Inspect payment request parameters `name`, `phone`, and `email` for unexpected submission of card data and postal codes.
 
 **Endpoint (Android):**
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
-- Check `SharedPreferences("MyInformation")` for plaintext keys like `credit_card_number` or `osskey`.
+- Inspect `SharedPreferences("MyInformation")` for plaintext account credentials and authentication-related values such as `user`, `pass`, `osskey`, `osssecre`, `securityToken`, `api_token_str`, and `rongImToken`.
+- Inspect the payment-related SharedPreferences stores `sp_name_win_ed`, `sp_phone_win_ed`, and `sp_email_win_ed` for potentially retained payment form values.
 
 ---
 
