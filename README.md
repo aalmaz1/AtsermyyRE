@@ -78,17 +78,19 @@ Key findings from `AndroidManifest.xml`:
 ![Insecure application settings](images/manifest_application.png)
 *Insecure settings: `allowBackup="true"`, `usesCleartextTraffic="true"`, `largeHeap="true"`.*
 
-- `allowBackup="true"` — app data (including `SharedPreferences` with password and tokens) can be
-  extracted via `adb backup`.
+- `allowBackup="true"` — enables Android backup behavior where supported. It does not by itself prove that application data can be extracted through `adb backup`; actual backup behavior depends on Android version, backup transport, device policy, and backup rules.
 - `usesCleartextTraffic="true"` — HTTP without encryption is allowed.
 - `exported="true"` on `MyWindowmanagerServiceRong` — the service is reachable from other apps.
 
 ### Exported Components (Attack Surface)
 
-- **`com.FeiQQ.FeiQQ.ui.Topic_im_new_Activity`** — explicitly `exported="true"` with **no intent filter**. Any app on the device can launch this activity directly. This is a potential intent-redirection vector.
-- **`com.FeiQQ.FeiQQ.service.MyWindowmanagerServiceRong`** — explicitly `exported="true"`. A window-management service reachable from other apps. In combination with `SYSTEM_ALERT_WINDOW`, this allows a third-party app to draw overlays over banking apps.
-- **`io.rong.push.notification.RongBridgeActivity`** — exported, standard RongCloud bridge activity.
-- **`com.google.firebase.iid.FirebaseInstanceIdReceiver`** — exported, protected by `com.google.android.c2dm.permission.SEND` (standard).
+- **`com.FeiQQ.FeiQQ.ui.Topic_im_new_Activity`** — explicitly `exported="true"` with no intent filter. Other applications may be able to launch this activity explicitly, subject to Android component access rules. This creates an externally reachable activity surface; an intent-redirection vulnerability has not been demonstrated.
+
+- **`com.FeiQQ.FeiQQ.service.MyWindowmanagerServiceRong`** — explicitly `exported="true"`. This exposes the service to potential external interaction, subject to its actual access checks and implementation. The presence of `SYSTEM_ALERT_WINDOW` indicates that overlay functionality may be relevant, but the ability of another application to use this service to display overlays over banking applications has not been demonstrated.
+
+- **`io.rong.push.notification.RongBridgeActivity`** — exported RongCloud bridge activity.
+
+- **`com.google.firebase.iid.FirebaseInstanceIdReceiver`** — exported receiver protected by `com.google.android.c2dm.permission.SEND`.
 
 ### Insecure Configuration Flags
 
@@ -239,17 +241,11 @@ The `toString()` implementation includes payment-related fields and other sensit
 
 ## API Authentication Weakness
 
-API requests are signed as:
+The client computes the request token as:
 
 ```text
 api_token = MD5( mod + act + api_version + api_token_str )
 ```
-
-This is a plain MD5 over a predictable concatenation, without a server-side secret.
-If `api_token_str` leaks (and it is stored in plaintext on the device),
-requests can be forged.
-
----
 
 ## 🎯 MITRE ATT&CK for Mobile — Preliminary Mapping
 
@@ -257,20 +253,10 @@ The following is a preliminary mapping of observed application behavior to MITRE
 
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
-| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | APK distributed outside official stores (side-loading via messengers) and `REQUEST_INSTALL_PACKAGES` permission for installing additional payloads. |
-| **Execution** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Auto-start on boot via `RECEIVE_BOOT_COMPLETED` and handling of system events (`USER_PRESENT`, `POWER_CONNECTED/DISCONNECTED`). |
-| **Persistence** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Persistence via Broadcast Receivers (`PushReceiver`, `FirebaseInstanceIdReceiver`). |
-| **Defense Evasion** | **[T1406](https://attack.mitre.org/techniques/T1406/)** | Obfuscated Files or Information | Base64-encoded payment URLs (`aHR0cHM6Ly8wbmxpbmVwYXku...` → `https://0nlinepay[.]com/...` in `Base64Utils.smali`). |
-| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | Confirmed payment-form input collection: PAN and CVV are read directly from EditText fields and submitted through the payment API request. See PayNew_Activity$myOnClick.smali. |
-| 
-| **Discovery** | **[T1426](https://attack.mitre.org/techniques/T1426/)** | System Information Discovery | Collection of device identifiers (`Build.MODEL`, `Build.VERSION.RELEASE`, `TelephonyManager`) in `WelcomeActivity.smali` and `NewTaskActivity.smali`. |
-| | **[T1420](https://attack.mitre.org/techniques/T1420/)** | File and Directory Discovery | Request for direct filesystem access via `MANAGE_EXTERNAL_STORAGE` and `READ/WRITE_EXTERNAL_STORAGE`. |
-| | **[T1430](https://attack.mitre.org/techniques/T1430/)** | Location Tracking | Request for precise and approximate location via `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION`. |
-| **Collection** | **[T1429](https://attack.mitre.org/techniques/T1429/)** | Audio Capture | Microphone audio recording via `RECORD_AUDIO` permission. |
-| **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | Command and control and data exfiltration over HTTP/HTTPS to `https://www[.]opppi[.]com/api.php` via `AbHttpUtil`. |
-| | **[T1481](https://attack.mitre.org/techniques/T1481/)** | Web Service | Use of third-party infrastructure (RongCloud RTC/IM, Firebase Messaging) for push commands and message delivery. |
-| | **[T1521](https://attack.mitre.org/techniques/T1521/)** | Encrypted Channel | Use of weak DES encryption (`ChatActivity.smali`, `ChatRongActivity.smali`) to obfuscate message traffic. |
-| **Privilege Escalation** | **[T1626](https://attack.mitre.org/techniques/T1626/)** | Abuse Elevation Control Mechanism | **Potential chain:** Exported `MyWindowmanagerServiceRong` service combined with `SYSTEM_ALERT_WINDOW` and the C2 command `phone_control_user`. (Requires further dynamic analysis to confirm actual privilege abuse). |
+| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The APK was delivered directly through a messenger rather than an official app store. |
+| **Execution** | **[T1624.001](https://attack.mitre.org/techniques/T1624/001/)** | Event-Triggered Execution: Broadcast Receivers | Include only if the examined receiver implementation confirms execution in response to the relevant system broadcasts. |
+| **Credential Access / Collection** | **[T1417.002](https://attack.mitre.org/techniques/T1417/002/)** | Input Capture: GUI Input Capture | PAN and CVV are read directly from payment form EditText fields and inserted into an HTTP POST request. See `PayNew_Activity$myOnClick.smali`. |
+| **Command and Control** | **[T1437](https://attack.mitre.org/techniques/T1437/)** | Application Layer Protocol | The application communicates with its backend API over HTTP/HTTPS. This establishes application-layer network communication, but does not by itself establish that every API operation is C2. |
 
 ---
 
