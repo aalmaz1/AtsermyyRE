@@ -396,23 +396,21 @@ services, including AWS and RongCloud.
 | `Push` | `register`, `unbind` | FCM/RongCloud push |
 | `WebMessage` | `pl`, `zan`, `atme` | Web notifications |
 
-### Remote Phone Control Endpoint
+### `phone_control_user` Endpoint and Floating Window
 
-`MyWindowmanagerServiceRong.smali:18` defines:
+The application defines and uses a backend endpoint named `phone_control_user` under `mod=Receive`.
 
-```text
-PHONE_CONTROL_USER = "hxxps://www[.]opppi[.]com/api.php?ap=2&client_id=1&abc=1&..."
-```
+The inspected response listener parses the server response into an `AllMsgVo` object and reads its `code` field:
 
-The application defines a backend endpoint named `phone_control_user` under `mod=Receive` and contains an exported `MyWindowmanagerServiceRong` service.
+- `700`: sets the service state to `freeman`.
+- `704`: sets the state to `notfreeman` and sends message `0x16e` to `changeImageHandler`.
+- Other response codes: also set the state to `notfreeman` and send message `0x16e`.
 
-The examined service code uses Android's `WindowManager` API, including `addView()` and `removeView()`, to manage floating UI elements. The application also requests `SYSTEM_ALERT_WINDOW`, which is associated with displaying overlays over other applications when the required special access is granted.
+The corresponding `handleMessage()` implementation in `MyWindowmanagerServiceRong$1` processes message `0x16e` by checking the user's `sex` value. If it is not equal to `"2"`, the service invokes `deductgold()`.
 
-Background timers and handlers update the floating interface.
+The examined `0x16e` branch does not show modifications to floating-window Views, window coordinates, dimensions, visibility, or `WindowManager.LayoutParams`.
 
-However, the examined evidence does not establish that backend responses trigger remote UI-control commands. No implementation using `AccessibilityService`, `dispatchGesture()`, `performClick()`, or synthetic touch-event injection was identified in the searched code.
-
-**Assessment:** Floating-window functionality is identified. Remote screen automation, simulated touch input, and tapjacking have not been demonstrated. The relationship between the `phone_control_user` endpoint and the floating-window operations requires further verification.
+**Assessment:** The examined endpoint response is associated with application account/service-status and billing logic. The inspected response-to-handler path does not demonstrate remote control of the floating window, remote screen automation, simulated touch input, or tapjacking. Other message-handler branches and unrelated service methods should be assessed separately before making broader claims about all floating-window behavior.
 
 ### Weak Encryption & WebView Configuration
 
