@@ -533,6 +533,8 @@ To detect this specific campaign or similar threats:
 - Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5[.]cloudfront[.]net`.
 - Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
 - Monitor POST requests to `/api.php` with `mod=Pay&act=pay`.
+- Review the `name`, `phone`, and `email` parameters as cardholder and contact information.
+- Do not treat these parameters as PAN, CVV/CVC, or postal-code transmission indicators based on the examined request handler.
 
 **Endpoint (Android):**
 - Search for the presence of the package `com.FeiQQ.FeiQQ`.
