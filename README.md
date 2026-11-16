@@ -166,7 +166,7 @@ Static analysis of `PayNew_Activity.smali`, `PayNew_Activity$myOnClick.smali`, a
 | `et_name_142` | Hidden integer-input EditText with hint `111` and maximum length 3; likely intended for CVV/CVC |
 | `et_name_122`, `et_name_123` | TextViews associated with expiry month/year selection |
 | `et_name_162` | Phone number |
-| `et_name_182` | Email address |
+| `et_name_182` | Input value added to the HTTP parameter `email`; the exact UI meaning (email or ZIP-related input) requires confirmation |
 | `et_name_222` | Postal code field in a hidden form section |
 
 The PAN-like and CVV-like fields are declared in `PayNew_Activity` and initialized using `findViewById()`. Their parent containers are marked `visibility="gone"` in the examined layout.
@@ -187,7 +187,7 @@ The payment handler constructs an `AbRequestParams` object and adds the followin
 
 | HTTP parameter | Source | Observed meaning |
 |---|---|---|
-| `email` | `et_name_182` | Email address |
+| `email` | `et_name_182` | Value taken from the corresponding form field; the parameter is named `email` |
 | `phone` | `et_name_162` | Phone number |
 | `name` | `et_name_72` | Cardholder name |
 | `uid` | `PMyInformation.getUid()` | User identifier |
@@ -219,7 +219,7 @@ The value represents the public egress IP observed by the external service, whic
 
 **Assessment**
 
-The examined payment flow confirms submission of a cardholder name, phone number, email address, user identifier, IP-check result, device model, payment amount, and additional application-defined parameters to the payment API.
+The examined payment flow confirms submission of a cardholder name, phone number, the value from et_name_182, submitted under the parameter name email, user identifier, IP-check result, device model, payment amount, and additional application-defined parameters to the payment API.
 
 It also confirms that the handler reads two hidden fields apparently intended for PAN and CVV/CVC and invokes Base64 encoding on their contents. However, the encoded results are not captured, and no corresponding PAN/CVV persistence or request-parameter flow was identified in the examined code.
 
@@ -339,10 +339,7 @@ The following is a preliminary mapping of observed application behavior to MITRE
 
 | Tactic | Technique ID | Technique Name | Evidence in APK |
 | :--- | :--- | :--- | :--- |
-| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The reported incident involved direct delivery of the APK through a
-messenger rather than an official app store. This mapping is based on
-the reported delivery method, not on an installation mechanism
-identified in the APK itself.|
+| **Initial Access** | **[T1476](https://attack.mitre.org/techniques/T1476/)** | Deliver Malicious App via Other Means | The reported incident involved direct delivery of the APK through a messenger rather than an official app store. This mapping is based on the reported delivery method, not on an installation mechanism identified in the APK itself. |
 
 ---
 
@@ -484,9 +481,12 @@ The background thread in `MyWindowmanagerServiceRong$3.run()` calls
 `access$1200()` and performs modulo comparisons using an integer value
 parsed from a string returned by `access$1300()`.
 
-The implementation of `access$1208()` itself has not yet been verified.
-Therefore, the exact counter update performed by that accessor should
-not be inferred from its name.
+The implementation of `access$1208()` was inspected. It reads the
+current `timevoice` value, increments the field by one, stores the
+updated value, and returns the previous value. The timer loop invokes
+this accessor after `Thread.sleep(1000)`. This establishes a nominal
+one-second sleep in the loop, not an exact one-second execution
+interval.
 
 The implementation of `checkgold(I)V` has not yet been independently
 audited. The inspected Handler branches establish that the method is
@@ -527,7 +527,7 @@ The inspected `SendVoiceActivity$1.handleMessage()` branch for message `0x14d` i
 
 This Activity-level behavior must be distinguished from the separate timer and Handler logic implemented by `MyWindowmanagerServiceRong$3` and `MyWindowmanagerServiceRong$1`.
 
-**Assessment:** The inspected Activity contains an incrementing call-related counter and a Handler branch that invokes a billing-related method. The available evidence does not establish the exact timer interval associated with `timevoice`, the amount charged per interval, or the backend's charging rules.
+**Assessment:** The inspected Activity performs a post-increment operation on the field named `timevoice` and a Handler branch that invokes a billing-related method. The available evidence does not establish the exact timer interval associated with `timevoice`, the amount charged per interval, or the backend's charging rules.
 
 ### Weak Encryption & WebView Configuration
 
