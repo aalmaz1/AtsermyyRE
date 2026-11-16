@@ -78,7 +78,9 @@ Key findings from `AndroidManifest.xml`:
 
 - `allowBackup="true"` — enables Android backup behavior where supported. It does not by itself prove that application data can be extracted through `adb backup`; actual backup behavior depends on Android version, backup transport, device policy, and backup rules.
 - `usesCleartextTraffic="true"` — HTTP without encryption is allowed.
-- `exported="true"` on `MyWindowmanagerServiceRong` — the service is reachable from other apps.
+- `exported="true"` on `MyWindowmanagerServiceRong` — exposes the
+  service to potential interaction from other applications, subject
+  to its permission requirements and implementation-level access checks.
 
 ### Exported Components (Attack Surface)
 
@@ -384,7 +386,7 @@ services, including AWS and RongCloud.
 | `User` | `userInfo`, `updateHeadimg`, `ad_set`, `autoDenounce` | Profile, ads, **auto-denounce** |
 | `Capital` | `getFinancialProducts`, `buyFinancialProduct`, `applyWithdraw`, `redeemInvestment` | **Investment module** |
 | `Resources` | `photo`, `video`, `user_vault`, `valut_list`, `delete_photo` | Private photo vault |
-| `Upload` | `get_sts_token`, `return_token`, `save_token`, `uploadImage` | S3 token exchange |
+| `Upload` | `get_sts_token`, `return_token`, `save_token`, `uploadImage` | S3-related credential and upload operations |
 | `Send` | `sendText`, `sendImg`, `sendVoice`, `room`, `phone_score`, `sendPhone` | Chat & **paid phone calls** |
 | `Receive` | `messageList`, `count`, `group_members` | Chat inbox |
 | `Gift` | `gift`, `buy`, `checkNum`, `send` | Virtual gifts |
@@ -536,7 +538,11 @@ This Activity-level behavior must be distinguished from the separate timer and H
   `setAllowFileAccess(true)` on its WebView. This configuration creates
   a WebView security concern, but the class name and configuration
   alone do not establish phishing behavior or card-data harvesting.
-- **`AdvertWebActivity`** also enables JavaScript, loading URLs from intent extras (potential open redirect).
+- **`AdvertWebActivity`** also enables JavaScript and loads URLs obtained
+  from Intent extras. This may allow externally supplied URLs to be
+  displayed in the WebView, depending on the Activity's export status
+  and input validation. An exploitable redirect vulnerability has not
+  been established.
 
 ### Anti-Analysis: Not Detected
 
