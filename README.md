@@ -25,7 +25,15 @@ The following functionality was identified:
 4. Collection and storage of certain account and contact information, including plaintext login credentials in application SharedPreferences. Additional authentication-related values are present in the application's data model, but their persistence must be assessed individually.
 5. A secondary APK download and installation mechanism, subject to Android installation controls.
 
-**Payment card analysis:** Static analysis identified a dating-themed application containing integrated USDT-related investment and payment functionality. The payment click handler reads these fields and invokes Base64 encoding, but the encoded return values are not captured. No code path populating these fields, persisting their values, or adding them to the examined payment request was identified. The payment request includes the cardholder name, phone number, and the value from `et_name_182` under the parameters `name`, `phone`, and `email`, respectively. The available evidence does not establish that PAN or CVV values are collected or transmitted through these fields.
+**Payment card analysis:** The examined payment handler reads two hidden
+fields apparently intended for PAN and CVV/CVC and invokes Base64
+encoding on their contents. However, the encoded return values are not
+captured. No code path populating these fields, persisting their values,
+or adding them to the examined payment request was identified. The
+payment request includes the cardholder name, phone number, and the
+value from `et_name_182` under the parameters `name`, `phone`, and
+`email`, respectively. The available evidence does not establish that
+PAN or CVV/CVC values are collected or transmitted through these fields.
 
 The application communicates with backend infrastructure associated with `opppi[.]com` and uses third-party services, including RongCloud and AWS infrastructure.
 
