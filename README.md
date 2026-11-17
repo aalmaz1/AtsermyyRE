@@ -25,7 +25,7 @@ The following functionality was identified:
 4. Collection and storage of certain account and contact information, including plaintext login credentials in application SharedPreferences. Additional authentication-related values are present in the application's data model, but their persistence must be assessed individually.
 5. A secondary APK download and installation mechanism, subject to Android installation controls.
 
-**Payment card analysis:** Static analysis identified two hidden payment-form fields that appear intended for card number (PAN) and security code (CVV/CVC). The payment click handler reads these fields and invokes Base64 encoding, but the encoded return values are not captured. No code path populating these fields, persisting their values, or adding them to the examined payment request was identified. The payment request instead includes the cardholder name, phone number, and email address under the parameters `name`, `phone`, and `email`, respectively. The available evidence does not establish that PAN or CVV values are collected or transmitted through these fields.
+**Payment card analysis:** Static analysis identified a dating-themed application containing integrated USDT-related investment and payment functionality. The payment click handler reads these fields and invokes Base64 encoding, but the encoded return values are not captured. No code path populating these fields, persisting their values, or adding them to the examined payment request was identified. The payment request includes the cardholder name, phone number, and the value from `et_name_182` under the parameters `name`, `phone`, and `email`, respectively. The available evidence does not establish that PAN or CVV values are collected or transmitted through these fields.
 
 The application communicates with backend infrastructure associated with `opppi[.]com` and uses third-party services, including RongCloud and AWS infrastructure.
 
@@ -43,11 +43,11 @@ The application communicates with backend infrastructure associated with `opppi[
 | Detection at time of check | 1/66 — *flagged by BitDefenderFalx as `Android.Riskware.Repack.RMDV` (PUA). An earlier scan showed 0/67. Scan results and engine counts may change over time.* |
 | Reported distribution | Sent directly via messenger (not Google Play) |
 | Incident Date | October 19, 2026 (date of the scam attempt) |
-| **Infrastructure Status** | **Mitigated by AWS (Case #179395433200804)** |
+| **Infrastructure Status** | AWS confirmed mitigation of the reported CloudFront and Route 53 resources (Case #179395433200804) |
 
 **Tooling used:** `jadx`, `apktool`, `Android Studio (Smali)`, `DNS propagation check`, `WHOIS`.
 
-**Case Status:** Reported to AWS Trust & Safety. AWS confirmed that the malicious infrastructure (CloudFront/Route 53) has been **mitigated** (Case #179395433200804).
+**Case Status:** Reported to AWS Trust & Safety. AWS confirmed that the reported CloudFront and Route 53 resources were mitigated under Case #179395433200804. This confirmation does not independently establish that all infrastructure associated with the application has been removed.
 ![AWS Mitigation Confirmation](images/aws_migration.png)
 *Official confirmation from AWS Trust & Safety that the reported infrastructure was mitigated.*
 
@@ -169,7 +169,7 @@ Static analysis of `PayNew_Activity.smali`, `PayNew_Activity$myOnClick.smali`, a
 | `et_name_122`, `et_name_123` | TextViews associated with expiry month/year selection |
 | `et_name_162` | Phone number |
 | `et_name_182` | Input value added to the HTTP parameter `email`; the exact UI meaning (email or ZIP-related input) requires confirmation |
-| `et_name_222` | Postal code field in a hidden form section |
+| `et_name_222` | Hidden form field; postal-code purpose not independently verified |
 
 The PAN-like and CVV-like fields are declared in `PayNew_Activity` and initialized using `findViewById()`. Their parent containers are marked `visibility="gone"` in the examined layout.
 
@@ -261,7 +261,9 @@ by itself establish that card data is populated, stored, or transmitted.
 Additional analysis of `PMyInformation.smali` identified storage of:
 
 - **Password** (`pass`) and **login** (`user`) in plaintext in `SharedPreferences("MyInformation")`.
-- **Authentication-related values:** the `PMyInformation` model contains fields for AWS-related values (`osskey`, `osssecre`, `securityToken`), API token material (`api_token_str`), RongCloud token (`rongImToken`), and session-related data. The inspected AWS setters only assign values in memory; persistent storage of these AWS credentials through those setters was not identified. Other values, including the account login and password, are stored in plaintext in `SharedPreferences("MyInformation")`.
+- **Authentication-related values:** the `PMyInformation` model contains fields for AWS-related values (`osskey`, `osssecre`, `securityToken`), API token material (`api_token_str`), RongCloud token (`rongImToken`), and session-related data. The inspected AWS setters only assign values in memory; persistent storage of these AWS credentials through those setters was not identified.
+
+- **Plaintext account credentials:** the application stores the account login (`user`) and password (`pass`) in `SharedPreferences("MyInformation")`.
 
 The `toString()` implementation includes payment-related fields and other sensitive model values. This creates a potential exposure risk if populated instances are logged. Actual logging of populated card data has not been established.
 
@@ -372,7 +374,7 @@ Static analysis of `Base64Utils.smali` revealed a Base64-encoded URL:
 ### API Surface (Grouped by `mod`)
 
 The application-specific API endpoints identified in the examined
-`Constant.smali` configuration use the following base URL:
+application code use the following base URL:
 
 `hxxps://www[.]opppi[.]com/api.php`
 
@@ -385,9 +387,9 @@ services, including AWS and RongCloud.
 | `Register` | `new_register`, `check_device`, `search_email` | Registration |
 | `User` | `userInfo`, `updateHeadimg`, `ad_set`, `autoDenounce` | Profile, ads, **auto-denounce** |
 | `Capital` | `getFinancialProducts`, `buyFinancialProduct`, `applyWithdraw`, `redeemInvestment` | **Investment module** |
-| `Resources` | `photo`, `video`, `user_vault`, `valut_list`, `delete_photo` | Private photo vault |
+| `Resources` | `photo`, `video`, `user_vault`, `valut_list`, `delete_photo` | Photo, video, and user-vault operations |
 | `Upload` | `get_sts_token`, `return_token`, `save_token`, `uploadImage` | S3-related credential and upload operations |
-| `Send` | `sendText`, `sendImg`, `sendVoice`, `room`, `phone_score`, `sendPhone` | Chat & **paid phone calls** |
+| `Send` | `sendText`, `sendImg`, `sendVoice`, `room`, `phone_score`, `sendPhone` | Chat and phone-call-related operations |
 | `Receive` | `messageList`, `count`, `group_members` | Chat inbox |
 | `Gift` | `gift`, `buy`, `checkNum`, `send` | Virtual gifts |
 | `Follow` | `doFollow`, `unFollow`, `getfollow` | Social graph |
@@ -533,7 +535,10 @@ This Activity-level behavior must be distinguished from the separate timer and H
 
 ### Weak Encryption & WebView Configuration
 
-- **DES encryption** is used in `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity` (`const-string v7, "des"`). DES is cryptographically broken (56-bit key) and unsuitable for protecting chat messages.
+- - **DES-related code:** The string `"des"` was identified in
+  `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity`.
+  The presence of this string alone does not establish that DES
+  encryption is actually used to protect transmitted chat messages.
 - **VisaWebActivity** enables `setJavaScriptEnabled(true)` and
   `setAllowFileAccess(true)` on its WebView. This configuration creates
   a WebView security concern, but the class name and configuration
@@ -683,7 +688,7 @@ establish when or for whom the certificate was created.
 This does not establish whether Realtime Database is disabled,whether another database configuration exists, or which Firebase services are used by the application.
 - **Skype ID (`yuan.zi4`):** Searched via Google and public databases. Result: **No public scam reports or correlations found at the time of check.**
 
-### Dropper / Secondary APK Delivery
+### Secondary APK Download and Installation Flow
 
 `WelcomeActivity` contains code that downloads an additional APK and launches the Android package installer.
 
@@ -709,7 +714,7 @@ Installation is subject to Android's package installation controls, including th
 To detect this specific campaign or similar threats:
 
 **Network:**
-- Look for outbound HTTP/HTTPS requests to `opppi[.]com` or CloudFront distributions resolving to `djd3j8k4vp1a5[.]cloudfront[.]net`.
+- Look for outbound HTTP/HTTPS requests to `opppi[.]com` and the hostname `djd3j8k4vp1a5[.]cloudfront[.]net`.
 - Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
 - Monitor POST requests to `/api.php` with `mod=Pay&act=pay`.
 - Review the `name`, `phone`, and `email` parameters as cardholder and contact information.
