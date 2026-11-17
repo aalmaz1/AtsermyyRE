@@ -535,14 +535,13 @@ This Activity-level behavior must be distinguished from the separate timer and H
 
 ### Weak Encryption & WebView Configuration
 
-- - **DES-related code:** The string `"des"` was identified in
-  `ChatActivity`, `ChatRongActivity`, and `GroupChatActivity`.
-  The presence of this string alone does not establish that DES
-  encryption is actually used to protect transmitted chat messages.
+- **DES encryption:** No evidence of DES-based encryption of chat messages was identified in the examined application Smali code. The `des` field in `MyMessageInfoVo` is a `String` with ordinary getter and setter methods (`getDes()` and `setDes(String)`). Its reported use is associated with message-description data, including red-envelope and gift descriptions, which is displayed in chat UI elements. No HTTP POST parameter carrying this field was identified in the examined code. The application's identified `MessageDigest` usage is for MD5-based API request-token generation and is not evidence of chat-message encryption. Native library binaries were not independently analyzed; therefore, this finding does not establish whether third-party SDKs implement encryption internally.
+
 - **VisaWebActivity** enables `setJavaScriptEnabled(true)` and
   `setAllowFileAccess(true)` on its WebView. This configuration creates
   a WebView security concern, but the class name and configuration
   alone do not establish phishing behavior or card-data harvesting.
+
 - **`AdvertWebActivity`** also enables JavaScript and loads URLs obtained
   from Intent extras. This may allow externally supplied URLs to be
   displayed in the WebView, depending on the Activity's export status
