@@ -21,8 +21,9 @@ The following functionality was identified:
 
 1. Dating and communication features, including chat, video calls, and virtual gifts.
 2. Investment-related functionality involving USDT and financial products.
-3. Backend API operations for purchasing financial products, managing investments, and requesting withdrawals.
-4. Collection and storage of certain account and contact information, including plaintext login credentials in application SharedPreferences. Additional authentication-related values are present in the application's data model, but their persistence must be assessed individually.
+3. Client-side API request flows for purchasing financial products, managing investment-related operations, and requesting withdrawals.
+4. Handling of account and contact information, including plaintext
+storage of login credentials in application SharedPreferences. Additional authentication-related values are present in the application's data model, but their persistence must be assessed individually.
 5. A secondary APK download and installation mechanism, subject to Android installation controls.
 
 **Payment card analysis:** The examined payment handler reads two hidden
@@ -363,7 +364,12 @@ associated with the application:
 
 - **Crypto Wallet (USDT TRC-20):** `TNPrZmfAiSMdYTV8kU4fcxDeErZWXGBXro`
   *(Hardcoded in `Usd_Activity` as a USDT-related wallet address. Its exact role in completed transactions has not been independently established.)*
-- **Blockchain Activity:** At the time of the blockchain check, the address showed 4,335 lifetime transactions and no activity during the preceding 180 days. Historical transactions included transfers associated with OKX-labeled addresses. These observations do not identify the wallet owner or establish a wallet-rotation strategy.
+- - **Blockchain Activity:** At the time of checking on [DATE],
+  the address showed 4,335 lifetime transactions and no activity
+  during the preceding 180 days. Historical transactions included
+  transfers associated with addresses labeled as OKX by [SOURCE].
+  These observations do not identify the wallet owner or establish
+  a wallet-rotation strategy.
 - **Operator Contact (Skype):** `yuan.zi4` 
   *(Hardcoded in `activity_fargot.xml` and `usd_layout.xml` as admin support).*
 - **Email:** `Onlinedating999[@]proton[.]me`
@@ -567,7 +573,8 @@ The application's identified `MessageDigest.getInstance("MD5")` usage is associa
 
 #### WebView Configuration
 
-- **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. This configuration creates a WebView security concern, but the class name and configuration alone do not establish phishing behavior or card-data harvesting.
+- **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. This combination can
+  increase the attack surface if untrusted content is loaded or exposed to file-origin access. The inspected configuration alone does not establish an exploitable vulnerability, phishing behavior, or card-data harvesting.
 
 - **`AdvertWebActivity`** also enables JavaScript and loads URLs obtained from Intent extras. This may allow externally supplied URLs to be displayed in the WebView, depending on the Activity's export status and input validation. An exploitable redirect vulnerability has not been established.
 
@@ -752,8 +759,8 @@ To detect this specific campaign or similar threats:
 
 **Network:**
 - Look for outbound HTTP/HTTPS requests to `opppi[.]com` and the hostname `djd3j8k4vp1a5[.]cloudfront[.]net`.
-- Monitor for POST requests to `/api.php` with parameters starting with `mod=Capital&act=`.
-- Monitor POST requests to `/api.php` with `mod=Pay&act=pay`.
+- Monitor POST requests to `/api.php` whose URL query string contains `mod=Capital&act=` and investment-related action names.
+- Monitor POST requests to `/api.php` whose URL query string contains `mod=Pay&act=pay`.
 - Review the `name`, `phone`, and `email` parameters as cardholder and contact information.
 - Do not treat these parameters as PAN, CVV/CVC, or postal-code transmission indicators based on the examined request handler.
 
