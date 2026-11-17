@@ -535,18 +535,48 @@ This Activity-level behavior must be distinguished from the separate timer and H
 
 ### Weak Encryption & WebView Configuration
 
-- **DES encryption:** No evidence of DES-based encryption of chat messages was identified in the examined application Smali code. The `des` field in `MyMessageInfoVo` is a `String` with ordinary getter and setter methods (`getDes()` and `setDes(String)`). Its reported use is associated with message-description data, including red-envelope and gift descriptions, which is displayed in chat UI elements. No HTTP POST parameter carrying this field was identified in the examined code. The application's identified `MessageDigest` usage is for MD5-based API request-token generation and is not evidence of chat-message encryption. Native library binaries were not independently analyzed; therefore, this finding does not establish whether third-party SDKs implement encryption internally.
+#### DES and Chat Message Handling
 
-- **VisaWebActivity** enables `setJavaScriptEnabled(true)` and
-  `setAllowFileAccess(true)` on its WebView. This configuration creates
-  a WebView security concern, but the class name and configuration
-  alone do not establish phishing behavior or card-data harvesting.
+Static analysis did not identify evidence that the application uses DES encryption to protect chat-message content in the examined Smali code.
 
-- **`AdvertWebActivity`** also enables JavaScript and loads URLs obtained
-  from Intent extras. This may allow externally supplied URLs to be
-  displayed in the WebView, depending on the Activity's export status
-  and input validation. An exploitable redirect vulnerability has not
-  been established.
+The string `des` in `MyMessageInfoVo` represents a message-description field rather than an established reference to the DES cryptographic algorithm.
+
+The inspected code supports the following data flow:
+
+`ChatActivity$16.lambda$onSuccess$0$ChatActivity$16()` → `MyMessageInfoVo.setDes(String)` → `MyMessageInfoVo.getDes()` → chat adapter → `TextView.setText()`.
+
+The `setDes()` call assigns a description value to the message model. The inspected chat adapters retrieve this value through `getDes()` and use it to populate text fields in the chat interface. The associated description data includes red-envelope and gift-related content.
+
+The `MyMessageInfoVo.toString()` implementation also includes the `des` and `redbag_desc` fields in its string representation. This establishes their inclusion in the model's textual representation, but does not by itself prove that populated values are written to Logcat.
+
+No HTTP POST parameter carrying the `des` field was identified in the examined code.
+
+The application's identified `MessageDigest.getInstance("MD5")` usage is associated with client-side API request-token generation. It is not evidence of DES encryption or encryption of chat-message content.
+
+**Native library limitation:** The binary instructions of `libRongIMLib.so` and `libRongRTCLib.so` were not independently analyzed. Consequently, this assessment does not establish whether those libraries implement encryption or transport protection internally. No conclusion about their SRTP or TLS implementation is made based solely on library names or third-party SDK documentation.
+
+**Assessment:** The claim that the application uses weak DES encryption for chat messages is not supported by the examined Smali evidence. The `des` field is used as message-description data. This finding is limited to the inspected application code and does not rule out cryptographic functionality inside unanalyzed native libraries.
+
+#### WebView Configuration
+
+- **`VisaWebActivity`** enables `setJavaScriptEnabled(true)` and `setAllowFileAccess(true)` on its WebView. This configuration creates a WebView security concern, but the class name and configuration alone do not establish phishing behavior or card-data harvesting.
+
+- **`AdvertWebActivity`** also enables JavaScript and loads URLs obtained from Intent extras. This may allow externally supplied URLs to be displayed in the WebView, depending on the Activity's export status and input validation. An exploitable redirect vulnerability has not been established.
+
+#### Evidence Verification Summary
+
+The following table summarizes the findings of the static-code checks. More than 1,600 Smali files across the examined `com.FeiQQ.FeiQQ` project and libraries were checked. Native `.so` binary instructions were not included in this count or independently analyzed.
+
+| Claim | Supporting file and method | Status |
+|---|---|---|
+| Application uses weak DES encryption for chat messages | No confirming DES cryptographic call identified in the examined Smali code | NOT FOUND |
+| `des` / `setDes()` represents the DES cryptographic algorithm | `MyMessageInfoVo.smali`: `getDes()`, `setDes(String)`, `toString()` | NOT FOUND |
+| `des` represents message-description data | `MyMessageInfoVo.smali`: `getDes()`, `setDes(String)`, `toString()`; `ChatActivity$16.smali`: `lambda$onSuccess$0$ChatActivity$16()`; chat adapter methods | CONFIRMED |
+| `des` is passed as an HTTP POST parameter | No matching request-parameter construction identified in the examined code | NOT FOUND |
+| Application uses MD5 for API request-token generation | `utile/MD5.smali`: `getMD5()`; inspected API request-token generation paths | CONFIRMED |
+| `VisaWebActivity` enables JavaScript and file access | `VisaWebActivity.smali`: `onCreate()` | CONFIRMED |
+| `AdvertWebActivity` enables JavaScript and loads URLs from Intent extras | `AdvertWebActivity.smali`: `onCreate()` and inspected URL-loading path | CONFIRMED |
+| Native RongCloud libraries implement TLS/SRTP | `libRongIMLib.so` and `libRongRTCLib.so` binary instructions were not analyzed | UNVERIFIED |
 
 ### Anti-Analysis: Not Detected
 
